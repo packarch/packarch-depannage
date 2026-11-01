@@ -73,6 +73,18 @@ ssh … root@packarch-NOM "packarch-depannage session-run 'packarch-skin bar'"
 ssh … root@packarch-NOM "packarch-depannage session-run 'notify-send \"Dépannage\" \"C’est réparé !\"'"
 ```
 
+`session-run` garde le dossier courant de la connexion SSH (`/root`, illisible pour
+l'utilisateur) : pour ouvrir une application graphique, commencer par `cd ~` et lui donner le
+dossier voulu (`session-run 'cd ~ && setsid -f thunar ~'`), sinon Thunar affiche une erreur
+« Impossible d'ouvrir le répertoire root ». Fermer une fenêtre précise :
+`session-run 'wmctrl -c "TITRE"'` (ne pas tuer le processus : Thunar et d'autres n'en ont qu'un
+pour toutes leurs fenêtres).
+
+**Fichiers d'un paquet supprimés ou abîmés** (icônes qui disparaissent, thème cassé…) :
+`pacman -Qk PAQUET | tail -1` compte les fichiers manquants, `pacman -Qkq PAQUET` les liste ;
+`pacman -S --noconfirm PAQUET` réinstalle à l'identique. Puis réappliquer le thème
+(`session-run 'packarch-skin apply THÈME'`) pour que les applications rechargent.
+
 ### Capture d'écran
 
 Capturer dans la session de l'utilisateur (`maim`, présent sur les deux bureaux ; en root,
