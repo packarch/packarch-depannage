@@ -66,8 +66,28 @@ impl Ui {
             format!("Fin automatique à {} (dans {left} min).", local_time(e))
         });
         let machine = st.dns_name.as_deref().unwrap_or(&st.hostname);
-        let (icon, title, text) = if st.ssh_sessions > 0 {
-            ("emblem-ok-symbolic", "Dépannage en cours", "La personne qui vous dépanne est connectée à cet ordinateur.".to_string())
+        let (icon, title, text) = if st.helping() {
+            // « : Fabrice (fab@example.com), depuis « archlinux » »
+            let account = match (&st.helper_name, &st.helper_login) {
+                (Some(n), Some(l)) if n != l => format!("{n} ({l})"),
+                (Some(n), _) => n.clone(),
+                (None, Some(l)) => l.clone(),
+                (None, None) => String::new(),
+            };
+            let host = st.helper.as_deref().map(|h| format!("depuis « {h} »")).unwrap_or_default();
+            let who = match (account.is_empty(), host.is_empty()) {
+                (false, false) => format!(" : {account}, {host}"),
+                (false, true) => format!(" : {account}"),
+                (true, false) => format!(" ({host})"),
+                (true, true) => String::new(),
+            };
+            let ago = st.last_activity.map(|t| session::now().saturating_sub(t) / 60);
+            let when = match ago {
+                Some(0) | None => "en ce moment".to_string(),
+                Some(1) => "il y a 1 min".to_string(),
+                Some(m) => format!("il y a {m} min"),
+            };
+            ("emblem-ok-symbolic", "Dépannage en cours", format!("La personne qui vous dépanne travaille sur cet ordinateur{who}. Dernière activité : {when}."))
         } else if st.backend == "Running" {
             ("network-transmit-receive-symbolic", "Prêt pour le dépannage", "L'ordinateur est joignable. La personne qui vous dépanne peut se connecter.".to_string())
         } else if st.auth_url.is_some() {

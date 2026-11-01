@@ -45,6 +45,63 @@ pub struct Status {
     pub dns_name: Option<String>,
     /// Connexions SSH en cours (dépannage en cours)
     pub ssh_sessions: usize,
+    /// Appareil qui a échangé avec l'ordinateur le plus récemment (la
+    /// personne qui dépanne), et l'heure de ce dernier échange
+    pub helper: Option<String>,
+    pub last_activity: Option<u64>,
+    /// Compte Tailscale de cet appareil : nom affiché et identifiant de
+    /// connexion (adresse e-mail…)
+    pub helper_name: Option<String>,
+    pub helper_login: Option<String>,
+}
+
+/// Délai pendant lequel une activité récente compte comme un dépannage en
+/// cours : les commandes passent par des connexions SSH séparées et très
+/// courtes, la fenêtre ne les verrait presque jamais ouvertes
+pub const ACTIVITY_SECS: u64 = 300;
+
+impl Status {
+    /// Dépannage en cours : connexion ouverte, ou activité récente
+    pub fn helping(&self) -> bool {
+        self.ssh_sessions > 0 || self.last_activity.is_some_and(|t| now().saturating_sub(t) < ACTIVITY_SECS)
+    }
+}
+
+/// Date RFC 3339 de Tailscale (« 2026-11-01T12:06:30.469+01:00 ») en
+/// secondes depuis 1970 ; None pour la date nulle (an 1)
+fn unix_time(s: &str) -> Option<u64> {
+    let t = gtk::glib::DateTime::from_iso8601(s, None).ok()?.to_unix();
+    (t > 0).then_some(t as u64)
+}
+
+/// Appareil qui a échangé le plus récemment avec l'ordinateur
+#[derive(Debug, PartialEq)]
+struct Peer {
+    host: String,
+    time: u64,
+    name: Option<String>,
+    login: Option<String>,
+}
+
+/// Pair le plus récemment actif (dernier paquet échangé), avec son compte
+/// (table « User » de tailscale status, par UserID)
+fn last_peer(j: &serde_json::Value) -> Option<Peer> {
+    let text = |v: &serde_json::Value| v.as_str().filter(|s| !s.is_empty()).map(str::to_string);
+    j["Peer"]
+        .as_object()?
+        .values()
+        .filter(|p| p["RxBytes"].as_u64().unwrap_or(0) > 0)
+        .filter_map(|p| {
+            let time = unix_time(p["LastWrite"].as_str()?)?;
+            let user = &j["User"][p["UserID"].as_u64().map(|u| u.to_string()).unwrap_or_default()];
+            Some(Peer {
+                host: p["HostName"].as_str().unwrap_or("?").to_string(),
+                time,
+                name: text(&user["DisplayName"]),
+                login: text(&user["LoginName"]),
+            })
+        })
+        .max_by_key(|p| p.time)
 }
 
 pub fn now() -> u64 {
@@ -236,6 +293,12 @@ pub fn status() -> Status {
     if let Some(j) = tailscaled_active().then(tailscale_status).flatten() {
         st.backend = j["BackendState"].as_str().unwrap_or("").to_string();
         st.auth_url = j["AuthURL"].as_str().filter(|s| !s.is_empty()).map(str::to_string);
+        if let Some(p) = last_peer(&j) {
+            st.helper = Some(p.host);
+            st.last_activity = Some(p.time);
+            st.helper_name = p.name;
+            st.helper_login = p.login;
+        }
         st.dns_name = j["Self"]["DNSName"]
             .as_str()
             .map(|s| s.trim_end_matches('.').to_string())
@@ -254,6 +317,20 @@ mod tests {
         let s = Status { active: true, end: Some(10), hostname: "packarch-pc".into(), ..Default::default() };
         let back: Status = serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
         assert_eq!(back, s);
+    }
+
+    #[test]
+    fn peers() {
+        let j: serde_json::Value = serde_json::from_str(r#"{"Peer": {
+            "a": {"HostName": "unraid", "RxBytes": 0, "LastWrite": "0001-01-01T00:00:00Z", "UserID": 7},
+            "b": {"HostName": "archlinux", "RxBytes": 600, "LastWrite": "2026-11-01T12:06:30.469348563+01:00", "UserID": 7},
+            "c": {"HostName": "minipc", "RxBytes": 10, "LastWrite": "2026-11-01T10:00:00Z", "UserID": 8}
+        }, "User": {"7": {"LoginName": "fab@example.com", "DisplayName": "Fabrice"}}}"#).unwrap();
+        assert_eq!(
+            last_peer(&j),
+            Some(Peer { host: "archlinux".into(), time: 1793531190, name: Some("Fabrice".into()), login: Some("fab@example.com".into()) })
+        );
+        assert_eq!(unix_time("0001-01-01T00:00:00Z"), None);
     }
 
     #[test]

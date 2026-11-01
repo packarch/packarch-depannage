@@ -16,6 +16,11 @@ ligne de commande, à travers [Tailscale](https://tailscale.com) et Tailscale SS
    l'ordinateur rejoint son réseau Tailscale avec le tag `tag:depannage`.
 4. Elle s'y connecte en root : `ssh root@packarch-<nom>` (Tailscale SSH : ni mot de passe,
    ni clé, c'est son identité Tailscale qui l'autorise).
+   Pendant qu'elle travaille, la fenêtre affiche « Dépannage en cours » avec son compte
+   Tailscale (nom et adresse) et l'appareil d'où elle travaille, tant qu'il y a eu de
+   l'activité dans les 5 dernières minutes (les commandes passent souvent par des connexions
+   SSH très courtes : l'activité réseau Tailscale est suivie, pas seulement les connexions
+   ouvertes).
 5. Au bout d'une heure (« +1 h » pour prolonger), ou avec « Arrêter maintenant », la session
    s'arrête : `tailscale logout` (l'ordinateur quitte le réseau), puis arrêt de `tailscaled`.
 
