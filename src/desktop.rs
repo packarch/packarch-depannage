@@ -91,6 +91,14 @@ pub fn session_run(cmd: &[String]) -> Result<i32, String> {
     let d = find().ok_or("aucune session graphique trouvée (personne n'est connecté ?)")?;
     let mut args: Vec<String> = vec!["-u".into(), d.user.clone(), "--".into(), "env".into(), "-i".into()];
     args.extend(d.env.iter().map(|(k, v)| format!("{k}={v}")));
+    // Dans un scope du systemd de l'utilisateur, pas dans la session SSH de
+    // root : ce que la commande démarre (polybar relancé par packarch-skin…)
+    // garderait sinon cette session distante, et ce qu'il lance à son tour
+    // n'aurait plus les droits du bureau (Éteindre du menu de polybar refusé
+    // sans rien dire par polkit). Le scope survit aussi à la connexion SSH.
+    if fs::metadata(format!("/run/user/{}/bus", d.uid)).is_ok() {
+        args.extend(["systemd-run", "--user", "--scope", "--quiet", "--collect", "--"].map(String::from));
+    }
     args.extend(["sh".into(), "-c".into(), cmd.join(" ")]);
     let status = Command::new("runuser").args(&args).status().map_err(|e| format!("runuser : {e}"))?;
     Ok(status.code().unwrap_or(1))
