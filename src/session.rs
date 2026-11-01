@@ -3,9 +3,12 @@
 //! nettoyage au démarrage de l'ordinateur. Et l'état de la session, lisible
 //! par tous (fenêtre).
 //!
-//! Rien ne tourne en dehors d'une session : tailscaled n'est jamais activé au
-//! démarrage, seulement démarré pendant la session puis arrêté, après
-//! `tailscale logout` (la machine quitte le réseau Tailscale).
+//! Rien ne tourne en dehors d'une session : le service tailscaled du système
+//! n'est pas utilisé. La session lance sa propre instance de tailscaled, avec
+//! l'état en mémoire (`--state=mem:`) : la machine est **éphémère**, Tailscale
+//! la supprime du réseau dès qu'elle se déconnecte (`tailscale logout` à
+//! l'arrêt), ou peu après si l'ordinateur s'éteint. Rien n'est écrit sur le
+//! disque (dossiers dans /run, effacés à l'arrêt de l'instance).
 
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -19,6 +22,9 @@ const STATE: &str = "/var/lib/packarch-depannage/session.json";
 pub const TAG: &str = "tag:depannage";
 /// Unités systemd transitoires de la session
 const UP_UNIT: &str = "packarch-depannage-up";
+/// Instance de tailscaled de la session
+const TSD_UNIT: &str = "packarch-depannage-tailscaled";
+const TAILSCALED: &str = "/usr/sbin/tailscaled";
 const STOP_UNIT: &str = "packarch-depannage-stop";
 const BIN: &str = "/usr/bin/packarch-depannage";
 
@@ -150,8 +156,37 @@ fn run(cmd: &str, args: &[&str]) -> bool {
         .is_ok_and(|s| s.success())
 }
 
-fn tailscaled_active() -> bool {
+/// Service tailscaled du système (Tailscale utilisé pour autre chose)
+fn system_tailscaled_active() -> bool {
     run("systemctl", &["is-active", "--quiet", "tailscaled"])
+}
+
+/// Instance de tailscaled de la session
+fn session_tailscaled_active() -> bool {
+    run("systemctl", &["is-active", "--quiet", &format!("{TSD_UNIT}.service")])
+}
+
+/// Lance l'instance de tailscaled de la session : état en mémoire (machine
+/// éphémère), mêmes réglages que le service du système (socket, nettoyage du
+/// réseau à l'arrêt)
+fn start_session_tailscaled() -> bool {
+    run(
+        "systemd-run",
+        &[
+            &format!("--unit={TSD_UNIT}"),
+            "--collect",
+            "--description=Tailscale du dépannage à distance (Packarch)",
+            "-p", "Type=notify",
+            "-p", "RuntimeDirectory=tailscale packarch-depannage",
+            "-p", "RuntimeDirectoryMode=0755",
+            "-p", &format!("ExecStopPost={TAILSCALED} --cleanup"),
+            TAILSCALED,
+            "--state=mem:",
+            "--statedir=/run/packarch-depannage/tailscale",
+            "--socket=/run/tailscale/tailscaled.sock",
+            "--port=0",
+        ],
+    )
 }
 
 /// Sortie JSON de « tailscale status » (None si tailscaled ne répond pas)
@@ -194,14 +229,14 @@ pub fn start(minutes: u64) -> Result<(), String> {
             println!("Session déjà en cours ({}).", s.hostname);
             return Ok(());
         }
-    } else if tailscaled_active() {
+    } else if system_tailscaled_active() {
         // Tailscale utilisé pour autre chose sur cet ordinateur : on n'y touche pas
         return Err("Tailscale est déjà utilisé sur cet ordinateur, en dehors du dépannage".into());
     }
     let hostname = hostname();
     let end = now() + minutes * 60;
     save(&Saved { end, hostname: hostname.clone() })?;
-    if !run("systemctl", &["start", "tailscaled"]) {
+    if !session_tailscaled_active() && !start_session_tailscaled() {
         let _ = fs::remove_file(STATE);
         return Err("impossible de démarrer tailscaled".into());
     }
@@ -249,12 +284,12 @@ pub fn stop_with(if_active: bool) -> Result<(), String> {
     }
     run("systemctl", &["stop", &format!("{STOP_UNIT}.timer")]);
     run("systemctl", &["stop", &format!("{UP_UNIT}.service")]);
-    if !tailscaled_active() {
-        run("systemctl", &["start", "tailscaled"]);
+    if session_tailscaled_active() {
+        // Retire la machine éphémère du réseau tout de suite (sans cela,
+        // Tailscale la supprime peu après sa déconnexion)
+        run("tailscale", &["logout"]);
+        run("systemctl", &["stop", &format!("{TSD_UNIT}.service")]);
     }
-    // Retire la machine du réseau (sinon elle y reste, hors ligne)
-    run("tailscale", &["logout"]);
-    run("systemctl", &["stop", "tailscaled"]);
     let _ = fs::remove_file(STATE);
     println!("Session de dépannage terminée.");
     Ok(())
@@ -290,7 +325,7 @@ pub fn status() -> Status {
         hostname: saved.hostname,
         ..Default::default()
     };
-    if let Some(j) = tailscaled_active().then(tailscale_status).flatten() {
+    if let Some(j) = session_tailscaled_active().then(tailscale_status).flatten() {
         st.backend = j["BackendState"].as_str().unwrap_or("").to_string();
         st.auth_url = j["AuthURL"].as_str().filter(|s| !s.is_empty()).map(str::to_string);
         if let Some(p) = last_peer(&j) {

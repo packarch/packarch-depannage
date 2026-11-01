@@ -24,7 +24,12 @@ ligne de commande, à travers [Tailscale](https://tailscale.com) et Tailscale SS
 5. Au bout d'une heure (« +1 h » pour prolonger), ou avec « Arrêter maintenant », la session
    s'arrête : `tailscale logout` (l'ordinateur quitte le réseau), puis arrêt de `tailscaled`.
 
-En dehors d'une session, rien ne tourne : `tailscaled` n'est jamais activé au démarrage.
+En dehors d'une session, rien ne tourne : le service `tailscaled` du système n'est pas utilisé.
+La session lance sa propre instance de `tailscaled` avec l'état **en mémoire**
+(`--state=mem:`) : l'ordinateur est une machine **éphémère**, que Tailscale supprime du réseau
+dès qu'elle se déconnecte (ou peu après si l'ordinateur s'éteint). Aucune entrée morte ne
+s'accumule dans la console, le nom reste le même d'une session à l'autre, et rien n'est écrit
+sur le disque.
 L'arrêt est programmé par une minuterie systemd : il a lieu même si la fenêtre est fermée.
 Si l'ordinateur est éteint pendant une session, `packarch-depannage-cleanup.service` la
 termine au démarrage suivant. Aucun secret n'est stocké sur l'ordinateur : c'est la personne
