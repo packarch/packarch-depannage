@@ -73,6 +73,21 @@ ssh … root@packarch-NOM "packarch-depannage session-run 'packarch-skin bar'"
 ssh … root@packarch-NOM "packarch-depannage session-run 'notify-send \"Dépannage\" \"C’est réparé !\"'"
 ```
 
+### Capture d'écran
+
+Capturer dans la session de l'utilisateur (`maim`, présent sur les deux bureaux ; en root,
+on ne voit pas son écran), rapatrier l'image et l'effacer de son ordinateur :
+
+```sh
+# Enregistrée dans le dossier Images de l'utilisateur de CETTE machine (pleine résolution)
+F="$(xdg-user-dir PICTURES)/depannage-packarch-NOM-$(date +%Y-%m-%d_%H-%M-%S).png"
+ssh -n … root@$IP "packarch-depannage session-run 'maim /tmp/capture-depannage.png' && cat /tmp/capture-depannage.png && rm -f /tmp/capture-depannage.png" > "$F"
+```
+
+Pour la regarder soi-même (et décrire l'écran à l'utilisateur), en faire une copie réduite
+dans le dossier temporaire de la session puis la lire avec l'outil de lecture d'images :
+`magick "$F" -resize '1600x1600>' -quality 85 /chemin/temporaire/capture.jpg`.
+
 ## 4. Repères Packarch
 
 - **Mises à jour** : `pacman -Syu --noconfirm` (dépôts CachyOS, Arch et `[packarch]`). Lire
