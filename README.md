@@ -91,6 +91,24 @@ ssh root@packarch-maman 'pacman -Syu --noconfirm'
 ssh root@packarch-maman "packarch-depannage session-run 'packarch-skin apply red-satanic'"
 ```
 
+## Dépanner avec Claude Code
+
+`claude/depannage/SKILL.md` est une compétence (skill) pour
+[Claude Code](https://claude.com/claude-code) : elle lui explique comment trouver
+l'ordinateur dans le réseau Tailscale, s'y connecter, agir dans le bureau de l'utilisateur
+(`session-run`), les repères de Packarch (packarch-skin, polybar, XFCE, mises à jour) et les
+règles de prudence (accord avant toute action risquée, pas de redémarrage, ne pas toucher à
+Tailscale sur l'ordinateur dépanné). Il suffit alors de demander, par exemple : « connecte-toi
+à packarch-maman et mets à jour le système ».
+
+Installation, sur l'ordinateur de la personne qui dépanne (avec Tailscale connecté à son
+réseau) : un lien vers le dossier du dépôt, pour que les mises à jour du dépôt s'appliquent.
+
+```sh
+mkdir -p ~/.claude/skills
+ln -s "$PWD/claude/depannage" ~/.claude/skills/depannage
+```
+
 ## Construction
 
 ```sh
