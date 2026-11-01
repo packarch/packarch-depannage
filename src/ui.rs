@@ -113,7 +113,8 @@ impl Ui {
     fn privileged(self: &Rc<Self>, args: &[&str], failure: &'static str) {
         let mut argv: Vec<&OsStr> = vec![OsStr::new("pkexec"), OsStr::new(BIN)];
         argv.extend(args.iter().map(OsStr::new));
-        let proc = match gio::Subprocess::newv(&argv, gio::SubprocessFlags::NONE) {
+        // stderr lu : la raison de l'échec est affichée, pas seulement FAILURE
+        let proc = match gio::Subprocess::newv(&argv, gio::SubprocessFlags::STDERR_PIPE) {
             Ok(p) => p,
             Err(e) => {
                 self.toast(&format!("{failure} : {e}"));
@@ -124,13 +125,34 @@ impl Ui {
         self.refresh();
         let ui = self.clone();
         glib::spawn_future_local(async move {
-            let ok = proc.wait_check_future().await.is_ok();
+            let stderr = match proc.communicate_utf8_future(None).await {
+                Ok((_, err)) => err.map(|s| s.to_string()).unwrap_or_default(),
+                Err(e) => e.to_string(),
+            };
             *ui.busy.borrow_mut() = false;
-            if !ok {
-                ui.toast(failure);
+            if !proc.is_successful() {
+                let reason = failure_reason(&proc, &stderr);
+                eprintln!("{failure} : {reason}");
+                ui.toasts.add_toast(adw::Toast::builder().title(format!("{failure} : {reason}")).timeout(15).build());
             }
             ui.refresh();
         });
+    }
+}
+
+/// Raison de l'échec de « pkexec packarch-depannage … » : la dernière ligne
+/// d'erreur du programme, ou le code de sortie de pkexec
+fn failure_reason(proc: &gio::Subprocess, stderr: &str) -> String {
+    if let Some(line) = stderr.lines().map(str::trim).filter(|l| !l.is_empty()).last() {
+        return line.strip_prefix("packarch-depannage : ").unwrap_or(line).to_string();
+    }
+    if !proc.has_exited() {
+        return format!("arrêté par le signal {}", proc.term_sig());
+    }
+    match proc.exit_status() {
+        126 => "autorisation refusée ou annulée".into(),
+        127 => "authentification impossible (agent polkit absent ?)".into(),
+        code => format!("code de sortie {code}"),
     }
 }
 

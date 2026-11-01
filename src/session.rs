@@ -156,6 +156,21 @@ fn run(cmd: &str, args: &[&str]) -> bool {
         .is_ok_and(|s| s.success())
 }
 
+/// Comme run, avec la dernière ligne d'erreur de CMD en cas d'échec
+fn run_err(cmd: &str, args: &[&str]) -> Result<(), String> {
+    let out = Command::new(cmd)
+        .args(args)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .output()
+        .map_err(|e| format!("{cmd} : {e}"))?;
+    if out.status.success() {
+        return Ok(());
+    }
+    let err = String::from_utf8_lossy(&out.stderr);
+    Err(err.lines().map(str::trim).filter(|l| !l.is_empty()).last().unwrap_or("échec").to_string())
+}
+
 /// Service tailscaled du système (Tailscale utilisé pour autre chose)
 fn system_tailscaled_active() -> bool {
     run("systemctl", &["is-active", "--quiet", "tailscaled"])
@@ -169,8 +184,8 @@ fn session_tailscaled_active() -> bool {
 /// Lance l'instance de tailscaled de la session : état en mémoire (machine
 /// éphémère), mêmes réglages que le service du système (socket, nettoyage du
 /// réseau à l'arrêt)
-fn start_session_tailscaled() -> bool {
-    run(
+fn start_session_tailscaled() -> Result<(), String> {
+    run_err(
         "systemd-run",
         &[
             &format!("--unit={TSD_UNIT}"),
@@ -236,9 +251,11 @@ pub fn start(minutes: u64) -> Result<(), String> {
     let hostname = hostname();
     let end = now() + minutes * 60;
     save(&Saved { end, hostname: hostname.clone() })?;
-    if !session_tailscaled_active() && !start_session_tailscaled() {
-        let _ = fs::remove_file(STATE);
-        return Err("impossible de démarrer tailscaled".into());
+    if !session_tailscaled_active() {
+        if let Err(e) = start_session_tailscaled() {
+            let _ = fs::remove_file(STATE);
+            return Err(format!("impossible de démarrer tailscaled ({e})"));
+        }
     }
     // tailscaled prêt à répondre
     for _ in 0..50 {
@@ -253,12 +270,12 @@ pub fn start(minutes: u64) -> Result<(), String> {
     run("systemctl", &["stop", &format!("{UP_UNIT}.service")]);
     let host = format!("--hostname={hostname}");
     let tags = format!("--advertise-tags={TAG}");
-    if !run(
+    if let Err(e) = run_err(
         "systemd-run",
         &[&format!("--unit={UP_UNIT}"), "--collect", "tailscale", "up", "--ssh", "--reset", &host, &tags, "--timeout=0"],
     ) {
         stop()?;
-        return Err("impossible de lancer « tailscale up »".into());
+        return Err(format!("impossible de lancer « tailscale up » ({e})"));
     }
     println!("Session démarrée : {hostname}, fin dans {minutes} min.");
     Ok(())
