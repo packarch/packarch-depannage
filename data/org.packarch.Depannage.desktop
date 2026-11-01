@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Remote help
+Name[fr]=Dépannage à distance
+Comment=Let a trusted person repair this computer for a limited time
+Comment[fr]=Autoriser temporairement une personne de confiance à réparer cet ordinateur
+Exec=packarch-depannage
+Icon=preferences-desktop-remote-desktop
+Terminal=false
+Categories=System;GTK;
+Keywords=help;remote;support;ssh;tailscale;dépannage;aide;distance;
+StartupNotify=true

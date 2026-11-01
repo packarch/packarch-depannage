@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<policyconfig>
+  <vendor>Packarch</vendor>
+  <vendor_url>https://github.com/packarch/packarch-depannage</vendor_url>
+
+  <!-- Démarrer ou prolonger une session : le mot de passe est demandé à
+       chaque fois (accord de l'utilisateur) -->
+  <action id="org.packarch.depannage.start">
+    <description>Allow remote help</description>
+    <description xml:lang="fr">Autoriser le dépannage à distance</description>
+    <message>Authentication is required to give remote access to this computer</message>
+    <message xml:lang="fr">Un mot de passe est nécessaire pour donner un accès à distance à cet ordinateur</message>
+    <icon_name>preferences-desktop-remote-desktop</icon_name>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/packarch-depannage</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
+  </action>
+
+  <!-- Arrêter une session : sans mot de passe pour l'utilisateur devant
+       l'écran -->
+  <action id="org.packarch.depannage.stop">
+    <description>Stop remote help</description>
+    <description xml:lang="fr">Arrêter le dépannage à distance</description>
+    <message>Stop the remote access to this computer</message>
+    <message xml:lang="fr">Arrêter l'accès à distance à cet ordinateur</message>
+    <icon_name>preferences-desktop-remote-desktop</icon_name>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>yes</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/packarch-depannage</annotate>
+    <annotate key="org.freedesktop.policykit.exec.argv1">stop</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
+  </action>
+</policyconfig>

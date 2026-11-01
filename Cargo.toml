@@ -1,0 +1,18 @@
+[package]
+name = "packarch-depannage"
+version = "0.1.0"
+edition = "2024"
+description = "Temporary remote help (Tailscale SSH) for Packarch"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/packarch/packarch-depannage"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
+
+[dependencies]
+adw = { version = "0.9.2", package = "libadwaita", features = ["v1_5"] }
+gtk = { version = "0.11.5", package = "gtk4", features = ["v4_12"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
