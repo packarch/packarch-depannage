@@ -82,6 +82,8 @@ on ne voit pas son écran), rapatrier l'image et l'effacer de son ordinateur :
 # Enregistrée dans le dossier Images de l'utilisateur de CETTE machine (pleine résolution)
 F="$(xdg-user-dir PICTURES)/depannage-packarch-NOM-$(date +%Y-%m-%d_%H-%M-%S).png"
 ssh -n … root@$IP "packarch-depannage session-run 'maim /tmp/capture-depannage.png' && cat /tmp/capture-depannage.png && rm -f /tmp/capture-depannage.png" > "$F"
+# L'ouvrir sur l'écran de l'utilisateur de CETTE machine, sans attendre sa fermeture
+setsid -f viewnior "$F" >/dev/null 2>&1
 ```
 
 Pour la regarder soi-même (et décrire l'écran à l'utilisateur), en faire une copie réduite
