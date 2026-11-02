@@ -43,8 +43,13 @@ IP=$(tailscale ip -4 packarch-NOM)
 ssh -n -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new root@$IP 'packarch-depannage info'
 ```
 
-- `-n` est indispensable : sans lui, `ssh` lit l'entrée standard et avale la suite d'un
-  script (plusieurs `ssh` dans un même bloc).
+- `-n` est indispensable pour une commande passée en argument : sans lui, `ssh` lit
+  l'entrée standard et avale la suite d'un script (plusieurs `ssh` dans un même bloc).
+- **Mais pas de `-n` pour envoyer un script par l'entrée standard** : avec `-n`, le
+  heredoc n'est pas transmis, la commande ne fait rien et ne signale aucune erreur.
+  Pour plusieurs commandes distantes d'un coup :
+  `ssh -o BatchMode=yes -o ConnectTimeout=15 root@$IP 'bash -s' <<'EOF' … EOF`
+  (le heredoc devient l'entrée de ce `ssh`, la suite du bloc n'est pas avalée).
 - Le shell de cette machine est zsh : une variable d'options (`O="-n -o …"; ssh $O …`) n'y
   est pas découpée. Écrire les options en entier, ou passer le bloc à `bash <<'EOF' … EOF`.
 
