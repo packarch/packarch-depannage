@@ -1,11 +1,16 @@
 //! Fenêtre : un bouton pour autoriser le dépannage, puis le lien à
 //! transmettre, l'état de la connexion, la fin automatique, « +1 h » et
-//! « Arrêter maintenant ». L'état est relu toutes les deux secondes.
+//! « Arrêter maintenant », et le tchat une fois l'ordinateur connecté. L'état est
+//! relu toutes les deux secondes, le tchat toutes les secondes. La personne qui
+//! dépanne passe par « Dépanner quelqu'un » (helper.rs).
 
+use crate::chat::{self, From};
+use crate::chat_view::ChatView;
+use crate::helper::Helper;
 use crate::session::{self, Status};
 use adw::prelude::*;
 use gtk::{gdk, gio, glib};
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::ffi::OsStr;
 use std::rc::Rc;
 
@@ -22,10 +27,15 @@ struct Ui {
     link: gtk::Label,
     details: gtk::Label,
     active_buttons: gtk::Box,
+    help_someone: gtk::Button,
     busy: RefCell<bool>,
+    chat: ChatView,
+    /// Position de lecture du tchat ; historique déjà affiché
+    chat_pos: Cell<u64>,
+    chat_loaded: Cell<bool>,
 }
 
-fn local_time(unix: u64) -> String {
+pub fn local_time(unix: u64) -> String {
     glib::DateTime::from_unix_local(unix as i64)
         .and_then(|d| d.format("%H h %M"))
         .map(|s| s.to_string())
@@ -49,6 +59,11 @@ impl Ui {
         self.start.set_sensitive(!busy);
         self.active_buttons.set_visible(st.active);
         self.active_buttons.set_sensitive(!busy);
+        self.help_someone.set_visible(!st.active);
+        self.show_chat(st.active && st.backend == "Running");
+        if let Some(name) = &st.helper_name {
+            self.chat.set_other(name);
+        }
         if !st.active {
             self.page.set_icon_name(Some("preferences-desktop-remote-desktop"));
             self.page.set_title("Dépannage à distance");
@@ -109,6 +124,33 @@ impl Ui {
         self.details.set_visible(true);
     }
 
+    /// Le tchat prend la place libre sous l'état, seulement pendant la session
+    fn show_chat(&self, on: bool) {
+        self.chat.root.set_visible(on);
+        self.page.set_vexpand(!on);
+        if on {
+            self.page.add_css_class("compact");
+        } else {
+            self.page.remove_css_class("compact");
+            self.chat.clear();
+            self.chat_pos.set(0);
+            self.chat_loaded.set(false);
+        }
+    }
+
+    /// Affiche les nouveaux messages
+    fn poll_chat(&self) {
+        if !self.chat.root.is_visible() {
+            return;
+        }
+        let live = self.chat_loaded.replace(true);
+        let mut pos = self.chat_pos.get();
+        for m in chat::read_new(chat::CHAT, &mut pos) {
+            self.chat.add(&m, live);
+        }
+        self.chat_pos.set(pos);
+    }
+
     /// pkexec packarch-depannage ARGS…, puis relecture de l'état
     fn privileged(self: &Rc<Self>, args: &[&str], failure: &'static str) {
         let mut argv: Vec<&OsStr> = vec![OsStr::new("pkexec"), OsStr::new(BIN)];
@@ -157,6 +199,11 @@ fn failure_reason(proc: &gio::Subprocess, stderr: &str) -> String {
 }
 
 fn build_ui(app: &adw::Application) {
+    // Déjà ouverte (relancée par un message reçu, ou depuis le menu)
+    if let Some(window) = app.active_window() {
+        window.present();
+        return;
+    }
     let start = gtk::Button::with_label("Autoriser le dépannage (1 h)");
     start.add_css_class("pill");
     start.add_css_class("suggested-action");
@@ -191,20 +238,32 @@ fn build_ui(app: &adw::Application) {
     content.append(&details);
     content.append(&start);
     content.append(&active_buttons);
+    let help_someone = gtk::Button::with_label("Dépanner quelqu'un");
+    help_someone.add_css_class("pill");
+    help_someone.set_halign(gtk::Align::Center);
+    content.append(&help_someone);
 
-    let page = adw::StatusPage::builder().child(&content).build();
-    let toasts = adw::ToastOverlay::new();
-    toasts.set_child(Some(&page));
+    let page = adw::StatusPage::builder().child(&content).vexpand(true).build();
+    let chat_view = ChatView::new(From::User, "La personne qui vous dépanne", "Écrire à la personne qui vous dépanne…");
+    let main = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    main.append(&page);
+    main.append(&chat_view.root);
     let toolbar = adw::ToolbarView::new();
     toolbar.add_top_bar(&adw::HeaderBar::new());
-    toolbar.set_content(Some(&toasts));
+    toolbar.set_content(Some(&main));
+
+    let nav = adw::NavigationView::new();
+    nav.add(&adw::NavigationPage::new(&toolbar, "Dépannage à distance"));
+    let toasts = adw::ToastOverlay::new();
+    toasts.set_child(Some(&nav));
+    let helper = Helper::new(&nav, &toasts);
 
     let window = adw::ApplicationWindow::builder()
         .application(app)
         .title("Dépannage à distance")
         .default_width(520)
-        .default_height(560)
-        .content(&toolbar)
+        .default_height(720)
+        .content(&toasts)
         .build();
 
     let ui = Rc::new(Ui {
@@ -215,8 +274,36 @@ fn build_ui(app: &adw::Application) {
         link: link.clone(),
         details,
         active_buttons,
+        help_someone: help_someone.clone(),
         busy: RefCell::new(false),
+        chat: chat_view.clone(),
+        chat_pos: Cell::new(0),
+        chat_loaded: Cell::new(false),
     });
+
+    {
+        let ui = ui.clone();
+        chat_view.on_send(move |text| {
+            match chat::append_to(chat::CHAT, From::User, &text) {
+                Ok(()) => ui.poll_chat(),
+                Err(e) => {
+                    ui.chat.restore(&text);
+                    ui.toast(&format!("Message non envoyé : {e}"));
+                }
+            }
+        });
+    }
+    {
+        let helper = helper.clone();
+        help_someone.connect_clicked(move |_| helper.open());
+    }
+    {
+        let helper = helper.clone();
+        window.connect_close_request(move |_| {
+            helper.close_conversation();
+            glib::Propagation::Proceed
+        });
+    }
 
     {
         let ui = ui.clone();
@@ -241,10 +328,19 @@ fn build_ui(app: &adw::Application) {
     }
 
     ui.refresh();
+    ui.poll_chat();
     {
         let ui = ui.clone();
         glib::timeout_add_seconds_local(2, move || {
             ui.refresh();
+            helper.tick();
+            glib::ControlFlow::Continue
+        });
+    }
+    {
+        let ui = ui.clone();
+        glib::timeout_add_seconds_local(1, move || {
+            ui.poll_chat();
             glib::ControlFlow::Continue
         });
     }

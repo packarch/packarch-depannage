@@ -110,6 +110,40 @@ fn last_peer(j: &serde_json::Value) -> Option<Peer> {
         .max_by_key(|p| p.time)
 }
 
+/// Ordinateur à dépanner, vu du réseau Tailscale de la personne qui dépanne
+#[derive(Clone, Debug, PartialEq)]
+pub struct Machine {
+    pub host: String,
+    pub ip: String,
+}
+
+/// Machines en ligne qui portent le tag du dépannage
+fn machines_in(j: &serde_json::Value) -> Vec<Machine> {
+    let mut list: Vec<Machine> = j["Peer"]
+        .as_object()
+        .into_iter()
+        .flat_map(|peers| peers.values())
+        .filter(|p| p["Online"].as_bool().unwrap_or(false))
+        .filter(|p| p["Tags"].as_array().is_some_and(|t| t.iter().any(|v| v.as_str() == Some(TAG))))
+        .filter_map(|p| {
+            Some(Machine { host: p["HostName"].as_str()?.to_string(), ip: p["TailscaleIPs"][0].as_str()?.to_string() })
+        })
+        .collect();
+    list.sort_by(|a, b| a.host.cmp(&b.host));
+    list
+}
+
+/// Ordinateurs à dépanner du réseau Tailscale de cet ordinateur
+pub fn machines_to_help() -> Result<Vec<Machine>, String> {
+    let advice = "Connectez cet ordinateur à votre réseau Tailscale, dans un terminal : \
+                  sudo systemctl enable --now tailscaled && sudo tailscale up";
+    let j = tailscale_status().ok_or(advice)?;
+    if j["BackendState"] != "Running" {
+        return Err(advice.into());
+    }
+    Ok(machines_in(&j))
+}
+
 pub fn now() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
 }
@@ -137,6 +171,11 @@ fn machine_name(raw: &str) -> String {
 
 fn load() -> Option<Saved> {
     serde_json::from_str(&fs::read_to_string(STATE).ok()?).ok()
+}
+
+/// Session en cours ?
+pub fn active() -> bool {
+    load().is_some()
 }
 
 fn save(s: &Saved) -> Result<(), String> {
@@ -205,7 +244,7 @@ fn start_session_tailscaled() -> Result<(), String> {
 }
 
 /// Sortie JSON de « tailscale status » (None si tailscaled ne répond pas)
-fn tailscale_status() -> Option<serde_json::Value> {
+pub fn tailscale_status() -> Option<serde_json::Value> {
     let out = Command::new("tailscale")
         .args(["status", "--json"])
         .stderr(Stdio::null())
@@ -214,7 +253,7 @@ fn tailscale_status() -> Option<serde_json::Value> {
     serde_json::from_slice(&out.stdout).ok()
 }
 
-fn require_root() -> Result<(), String> {
+pub fn require_root() -> Result<(), String> {
     // SAFETY: getuid n'a pas d'effet de bord
     if unsafe { getuid() } != 0 {
         return Err("à lancer en root (pkexec packarch-depannage …)".into());
@@ -263,6 +302,10 @@ pub fn start(minutes: u64) -> Result<(), String> {
             break;
         }
         std::thread::sleep(std::time::Duration::from_millis(200));
+    }
+    // Le dossier de la session existe (RuntimeDirectory de tailscaled)
+    if let Err(e) = crate::chat::ensure() {
+        eprintln!("tchat indisponible : {e}");
     }
     schedule_stop(minutes * 60)?;
     // « tailscale up » attend que le lien de connexion soit validé : il tourne
@@ -383,6 +426,18 @@ mod tests {
             Some(Peer { host: "archlinux".into(), time: 1793531190, name: Some("Fabrice".into()), login: Some("fab@example.com".into()) })
         );
         assert_eq!(unix_time("0001-01-01T00:00:00Z"), None);
+    }
+
+    #[test]
+    fn machines_to_help_filtered() {
+        let j: serde_json::Value = serde_json::from_str(r#"{"Peer": {
+            "a": {"HostName": "packarch-papa", "Online": true, "Tags": ["tag:depannage"], "TailscaleIPs": ["100.1.1.2", "fd7a::2"]},
+            "b": {"HostName": "packarch-maman", "Online": true, "Tags": ["tag:depannage"], "TailscaleIPs": ["100.1.1.1"]},
+            "c": {"HostName": "packarch-parti", "Online": false, "Tags": ["tag:depannage"], "TailscaleIPs": ["100.1.1.3"]},
+            "d": {"HostName": "minipc", "Online": true, "TailscaleIPs": ["100.1.1.4"]}
+        }}"#).unwrap();
+        let hosts: Vec<(String, String)> = machines_in(&j).into_iter().map(|m| (m.host, m.ip)).collect();
+        assert_eq!(hosts, [("packarch-maman".into(), "100.1.1.1".into()), ("packarch-papa".into(), "100.1.1.2".into())]);
     }
 
     #[test]

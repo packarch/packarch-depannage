@@ -7,7 +7,10 @@
 //! et elle peut s'y connecter en SSH (root). La session s'arrête toute seule
 //! (minuterie systemd), ou avec le bouton « Arrêter maintenant ».
 
+mod chat;
+mod chat_view;
 mod desktop;
+mod helper;
 mod session;
 mod ui;
 
@@ -25,7 +28,9 @@ En root (pkexec, ou par la fenêtre) :
   start [MINUTES]         démarre une session (60 min par défaut)
   extend [MINUTES]        prolonge la session (60 min par défaut)
   stop                    arrête la session
-  cleanup                 arrête une session restée ouverte (démarrage de l'ordinateur)";
+  cleanup                 arrête une session restée ouverte (démarrage de l'ordinateur)
+  chat-say                envoie à l'utilisateur le message lu sur l'entrée standard
+  chat-follow             affiche les messages du tchat au fil de l'eau (JSON)";
 
 fn minutes(arg: Option<&String>) -> Result<u64, String> {
     match arg {
@@ -56,6 +61,8 @@ fn main() -> ExitCode {
         Some("extend") => minutes(args.get(1)).and_then(session::extend),
         Some("stop") => session::stop(),
         Some("cleanup") => session::stop_with(true),
+        Some("chat-say") => chat::say(),
+        Some("chat-follow") => chat::follow(),
         Some("-h" | "--help" | "help") => {
             println!("{USAGE}");
             Ok(())

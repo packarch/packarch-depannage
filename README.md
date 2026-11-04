@@ -24,6 +24,21 @@ ligne de commande, à travers [Tailscale](https://tailscale.com) et Tailscale SS
 5. Au bout d'une heure (« +1 h » pour prolonger), ou avec « Arrêter maintenant », la session
    s'arrête : `tailscale logout` (l'ordinateur quitte le réseau), puis arrêt de `tailscaled`.
 
+## Tchat
+
+Dès que l'ordinateur est connecté, sa fenêtre affiche un tchat. La personne qui dépanne ouvre
+elle aussi **Dépannage à distance**, clique sur « Dépanner quelqu'un » (il lui faut Tailscale
+connecté à son réseau et `packarch-depannage` à jour) et choisit l'ordinateur dans la liste :
+aucune commande à taper. Une notification signale un message si la fenêtre n'est pas au premier
+plan ; si la personne dépannée a fermé la sienne, un message reçu la rouvre.
+
+L'ordinateur dépanné ne pouvant joindre personne, c'est la fenêtre de la personne qui dépanne
+qui vient lire et écrire les messages par Tailscale SSH. Ils sont dans
+`/run/packarch-depannage/chat.jsonl` : en mémoire, effacés à la fin de la session. Tant que le
+tchat est ouvert de son côté, l'ordinateur dépanné affiche « Dépannage en cours ».
+
+## Fin de session et traces
+
 En dehors d'une session, rien ne tourne : le service `tailscaled` du système n'est pas utilisé.
 La session lance sa propre instance de `tailscaled` avec l'état **en mémoire**
 (`--state=mem:`) : l'ordinateur est une machine **éphémère**, que Tailscale supprime du réseau
@@ -77,6 +92,9 @@ packarch-depannage session-run 'CMD'     CMD dans le bureau de l'utilisateur con
 pkexec packarch-depannage start [MIN]    démarre une session (60 min par défaut)
 pkexec packarch-depannage extend [MIN]   prolonge la session
 pkexec packarch-depannage stop           arrête la session (sans mot de passe)
+
+packarch-depannage chat-say              envoie le message lu sur l'entrée standard (root)
+packarch-depannage chat-follow           messages du tchat au fil de l'eau, en JSON (root)
 ```
 
 `session-run` lance la commande en tant que l'utilisateur connecté, avec l'environnement de
@@ -119,7 +137,7 @@ Fichiers à installer (paquet `packarch-depannage` de
 [myrepo-pkgs](https://github.com/packarch/myrepo-pkgs)) : le binaire dans `/usr/bin`,
 `data/org.packarch.Depannage.desktop`, `data/org.packarch.depannage.policy` (polkit) et
 `data/packarch-depannage-cleanup.service` (activé). Dépendances : `gtk4`, `libadwaita`,
-`tailscale`, `polkit`.
+`tailscale`, `polkit`, `openssh` (tchat de la personne qui dépanne).
 
 ## Licence
 
