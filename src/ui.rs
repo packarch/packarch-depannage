@@ -108,8 +108,8 @@ fn big_button(ui: &mut egui::Ui, text: &str, fill: Option<Color32>, enabled: boo
     ui.add_enabled(enabled, button).clicked()
 }
 
-/// Barre du haut : titre, version, retour éventuel. Vrai si « retour » est cliqué.
-fn header(ui: &mut egui::Ui, title: &str, subtitle: Option<&str>, back: bool) -> bool {
+/// Barre du haut : titre, retour éventuel. Vrai si « retour » est cliqué.
+fn header(ui: &mut egui::Ui, title: &str, back: bool) -> bool {
     let mut clicked = false;
     egui::Panel::top("header").show(ui, |ui| {
         ui.add_space(6.0);
@@ -122,9 +122,6 @@ fn header(ui: &mut egui::Ui, title: &str, subtitle: Option<&str>, back: bool) ->
             ui.add_space((width / 2.0 - used - 130.0).max(0.0));
             ui.allocate_ui_with_layout(egui::vec2(260.0, 34.0), Layout::top_down(Align::Center), |ui| {
                 ui.label(RichText::new(title).strong());
-                if let Some(s) = subtitle {
-                    ui.label(RichText::new(s).small().weak());
-                }
             });
         });
         ui.add_space(6.0);
@@ -206,7 +203,6 @@ struct ConversationView {
 struct App {
     bus: Bus,
     rx: Receiver<Event>,
-    version: String,
     screen: Screen,
     status: Status,
     busy: bool,
@@ -237,7 +233,6 @@ impl App {
         Self {
             bus,
             rx,
-            version: format!("Version {}", env!("CARGO_PKG_VERSION")),
             screen: Screen::Main,
             status: Status { hostname: session::hostname(), ..Default::default() },
             busy: false,
@@ -330,7 +325,6 @@ impl App {
     /// Écran principal : état, lien, boutons, et le tchat une fois connecté
     fn main_screen(&mut self, ui: &mut egui::Ui) {
         let st = self.status.clone();
-        header(ui, TITLE, Some(&self.version), false);
         let chat_on = st.active && st.backend == "Running";
         if chat_on {
             egui::Panel::top("status").show(ui, |ui| self.status_ui(ui, &st));
@@ -402,7 +396,7 @@ impl App {
     }
 
     fn machines_screen(&mut self, ui: &mut egui::Ui) {
-        if header(ui, "Dépanner quelqu'un", None, true) {
+        if header(ui, "Dépanner quelqu'un", true) {
             self.screen = Screen::Main;
             self.bus.want_machines.store(false, Ordering::Relaxed);
         }
@@ -450,7 +444,7 @@ impl App {
             return;
         };
         let host = view.conversation.machine.host.clone();
-        let back = header(ui, &host, None, true);
+        let back = header(ui, &host, true);
         let sent = chat_panels(ui, &mut view.log, From::Helper, &host, "Écrire à la personne dépannée…", view.banner.as_deref(), view.sendable);
         if let Some(text) = sent {
             view.conversation.send(text);
@@ -555,7 +549,7 @@ pub fn run() -> ExitCode {
         return ExitCode::SUCCESS;
     };
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_title(TITLE).with_app_id("org.packarch.Depannage").with_inner_size([520.0, 720.0]).with_min_inner_size([420.0, 500.0]),
+        viewport: egui::ViewportBuilder::default().with_title(format!("{TITLE} {}", env!("CARGO_PKG_VERSION"))).with_app_id("org.packarch.Depannage").with_inner_size([520.0, 720.0]).with_min_inner_size([420.0, 500.0]),
         ..Default::default()
     };
     match eframe::run_native(TITLE, options, Box::new(|cc| Ok(Box::new(App::new(cc))))) {
