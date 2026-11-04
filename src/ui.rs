@@ -248,8 +248,12 @@ fn build_ui(app: &adw::Application) {
     let main = gtk::Box::new(gtk::Orientation::Vertical, 0);
     main.append(&page);
     main.append(&chat_view.root);
+    // La version, pour savoir ce qui est installé de chaque côté
+    let header = adw::HeaderBar::new();
+    let version = format!("Version {}", env!("CARGO_PKG_VERSION"));
+    header.set_title_widget(Some(&adw::WindowTitle::new("Dépannage à distance", &version)));
     let toolbar = adw::ToolbarView::new();
-    toolbar.add_top_bar(&adw::HeaderBar::new());
+    toolbar.add_top_bar(&header);
     toolbar.set_content(Some(&main));
 
     let nav = adw::NavigationView::new();
