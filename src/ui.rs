@@ -15,7 +15,7 @@ use std::sync::mpsc::{Receiver, channel};
 use std::time::{Duration, Instant};
 
 const MINUTES: &str = "60";
-const TITLE: &str = "Dépannage à distance";
+const TITLE: &str = "Packarch Dépannage";
 const ACCENT: Color32 = Color32::from_rgb(53, 132, 228);
 const DANGER: Color32 = Color32::from_rgb(192, 28, 40);
 const TOAST_TIME: Duration = Duration::from_secs(10);
@@ -419,7 +419,7 @@ impl App {
                     ui.label(RichText::new("Aucun ordinateur à dépanner").size(22.0).strong());
                     ui.add_space(8.0);
                     ui.label(
-                        "La personne doit ouvrir « Dépannage à distance », cliquer sur « Autoriser le dépannage » \
+                        "La personne doit ouvrir « Packarch Dépannage », cliquer sur « Autoriser le dépannage » \
                          et vous envoyer le lien. Ouvrez ce lien avec votre compte Tailscale : son ordinateur \
                          apparaîtra ici.",
                     );
@@ -486,7 +486,7 @@ impl App {
                 if let Some(end) = &end {
                     ui.label(format!("Il s'arrêtera tout seul à {end}."));
                 }
-                ui.label("Pour l'arrêter avant, rouvrez « Dépannage à distance » depuis le menu.");
+                ui.label("Pour l'arrêter avant, rouvrez « Packarch Dépannage » depuis le menu.");
                 ui.add_space(12.0);
                 keep = big_button(ui, "Laisser la fenêtre ouverte", Some(ACCENT), true);
                 ui.add_space(8.0);

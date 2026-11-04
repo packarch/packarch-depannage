@@ -1,7 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=Remote help
-Name[fr]=Dépannage à distance
+Name=Packarch Dépannage
 Comment=Let a trusted person repair this computer for a limited time
 Comment[fr]=Autoriser temporairement une personne de confiance à réparer cet ordinateur
 Exec=packarch-depannage

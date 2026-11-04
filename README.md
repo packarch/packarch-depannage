@@ -6,7 +6,7 @@ ligne de commande, à travers [Tailscale](https://tailscale.com) et Tailscale SS
 
 ## Fonctionnement
 
-1. La personne à dépanner ouvre **Dépannage à distance** (menu Système) et clique sur
+1. La personne à dépanner ouvre **Packarch Dépannage** (menu Système) et clique sur
    « Autoriser le dépannage (1 h) ». Son mot de passe est demandé (pkexec) : rien ne
    s'ouvre sans son accord.
 2. La fenêtre affiche un **lien de connexion Tailscale** (`https://login.tailscale.com/a/…`)
@@ -27,7 +27,7 @@ ligne de commande, à travers [Tailscale](https://tailscale.com) et Tailscale SS
 ## Tchat
 
 Dès que l'ordinateur est connecté, sa fenêtre affiche un tchat. La personne qui dépanne ouvre
-elle aussi **Dépannage à distance**, clique sur « Dépanner quelqu'un » (il lui faut Tailscale
+elle aussi **Packarch Dépannage**, clique sur « Dépanner quelqu'un » (il lui faut Tailscale
 connecté à son réseau et `packarch-depannage` à jour) et choisit l'ordinateur dans la liste :
 aucune commande à taper. Une notification signale un message si la fenêtre n'est pas au premier
 plan ; si la personne dépannée a fermé la sienne, un message reçu la rouvre.
