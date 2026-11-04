@@ -345,6 +345,7 @@ pub fn stop_with(if_active: bool) -> Result<(), String> {
     run("systemctl", &["stop", &format!("{STOP_UNIT}.timer")]);
     run("systemctl", &["stop", &format!("{UP_UNIT}.service")]);
     if session_tailscaled_active() {
+        crate::chat::announce_stop();
         // Retire la machine éphémère du réseau tout de suite (sans cela,
         // Tailscale la supprime peu après sa déconnexion)
         run("tailscale", &["logout"]);

@@ -17,6 +17,14 @@ use std::path::Path;
 use std::time::Duration;
 
 pub const CHAT: &str = "/run/packarch-depannage/chat.jsonl";
+/// Présent quand la session s'arrête : chat-follow se termine normalement, avant
+/// que la connexion ne soit coupée (effacé avec le dossier de la session)
+const STOPPING: &str = "/run/packarch-depannage/stopping";
+/// Attente de la fin de chat-follow à l'arrêt de la session : relectures, délai
+/// laissé à son code de sortie pour parvenir à la fenêtre qui dépanne
+const STOP_WAIT: Duration = Duration::from_millis(100);
+const STOP_WAIT_MAX: u32 = 20;
+const STOP_GRACE: Duration = Duration::from_millis(400);
 /// Longueur maximale d'un message (caractères)
 const MAX_CHARS: usize = 2000;
 /// Délai entre deux relectures, et entre deux lignes vides de chat-follow : une
@@ -105,6 +113,32 @@ pub fn ensure() -> Result<(), String> {
     Ok(())
 }
 
+/// Processus chat-follow en cours
+fn followers() -> usize {
+    fs::read_dir("/proc")
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter_map(|e| fs::read(e.path().join("cmdline")).ok())
+        .filter(|c| c.split(|b| *b == 0).any(|a| a == b"chat-follow"))
+        .count()
+}
+
+/// Annonce la fin de la session à la fenêtre de la personne qui dépanne, tant que
+/// la connexion existe : sans cela, elle ne verrait qu'une connexion perdue
+pub fn announce_stop() {
+    if followers() == 0 || fs::write(STOPPING, "").is_err() {
+        return;
+    }
+    for _ in 0..STOP_WAIT_MAX {
+        if followers() == 0 {
+            std::thread::sleep(STOP_GRACE);
+            return;
+        }
+        std::thread::sleep(STOP_WAIT);
+    }
+}
+
 /// La fenêtre de l'utilisateur est-elle ouverte ?
 fn window_open() -> bool {
     fs::read_dir("/proc").into_iter().flatten().flatten().any(|e| {
@@ -140,7 +174,7 @@ pub fn follow() -> Result<(), String> {
     let mut out = std::io::stdout().lock();
     let mut pos = 0;
     let mut polls = 0;
-    while session::active() {
+    while session::active() && !Path::new(STOPPING).exists() {
         let mut text = String::new();
         for m in read_new(CHAT, &mut pos) {
             text += &serde_json::to_string(&m).map_err(|e| e.to_string())?;
