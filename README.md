@@ -1,6 +1,6 @@
 # packarch-depannage
 
-Petit logiciel GTK4/libadwaita en Rust pour le **dépannage à distance** d'un ordinateur
+Petit logiciel en Rust ([egui](https://github.com/emilk/egui)) pour le **dépannage à distance** d'un ordinateur
 [Packarch](https://github.com/packarch/CachyOS-Packarch) par une personne de confiance, en
 ligne de commande, à travers [Tailscale](https://tailscale.com) et Tailscale SSH.
 
@@ -136,8 +136,10 @@ cargo build --release
 Fichiers à installer (paquet `packarch-depannage` de
 [myrepo-pkgs](https://github.com/packarch/myrepo-pkgs)) : le binaire dans `/usr/bin`,
 `data/org.packarch.Depannage.desktop`, `data/org.packarch.depannage.policy` (polkit) et
-`data/packarch-depannage-cleanup.service` (activé). Dépendances : `gtk4`, `libadwaita`,
-`tailscale`, `polkit`, `openssh` (tchat de la personne qui dépanne).
+`data/packarch-depannage-cleanup.service` (activé). Dépendances : `tailscale`, `polkit`,
+`openssh` (tchat de la personne qui dépanne), `libnotify` et `wmctrl` (fenêtre), et ce
+qu'egui charge au démarrage (`libglvnd`, `libxkbcommon`, `libx11`, `libxcursor`, `libxi`,
+`libxrandr`). Jusqu'à la version 0.2.2 (tag `v0.2.2`), la fenêtre était en GTK4/libadwaita.
 
 ## Licence
 

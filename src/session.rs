@@ -76,7 +76,7 @@ impl Status {
 /// Date RFC 3339 de Tailscale (« 2026-11-01T12:06:30.469+01:00 ») en
 /// secondes depuis 1970 ; None pour la date nulle (an 1)
 fn unix_time(s: &str) -> Option<u64> {
-    let t = gtk::glib::DateTime::from_iso8601(s, None).ok()?.to_unix();
+    let t = chrono::DateTime::parse_from_rfc3339(s).ok()?.timestamp();
     (t > 0).then_some(t as u64)
 }
 

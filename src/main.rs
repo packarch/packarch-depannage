@@ -8,11 +8,10 @@
 //! (minuterie systemd), ou avec le bouton « Arrêter maintenant ».
 
 mod chat;
-mod chat_view;
 mod desktop;
-mod helper;
 mod session;
 mod ui;
+mod worker;
 
 use std::process::ExitCode;
 
@@ -43,7 +42,7 @@ fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let result = match args.first().map(String::as_str) {
         None => {
-            return ui::run().into();
+            return ui::run();
         }
         Some("status") => {
             println!("{}", serde_json::to_string_pretty(&session::status()).unwrap_or_default());
