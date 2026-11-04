@@ -215,6 +215,10 @@ struct App {
     machines: Result<Vec<Machine>, String>,
     view: Option<ConversationView>,
     next_id: u64,
+    /// Fermeture demandée pendant une session : confirmation affichée
+    confirm_close: bool,
+    /// Fermeture confirmée : ne plus l'intercepter
+    close_confirmed: bool,
 }
 
 impl App {
@@ -242,6 +246,8 @@ impl App {
             machines: Ok(Vec::new()),
             view: None,
             next_id: 0,
+            confirm_close: false,
+            close_confirmed: false,
         }
     }
 
@@ -455,6 +461,47 @@ impl App {
         }
     }
 
+    /// La session continue sans la fenêtre, qui porte le bouton pour l'arrêter :
+    /// une fermeture par mégarde ne doit pas la faire oublier
+    fn confirm_close_ui(&mut self, ctx: &egui::Context) {
+        if ctx.input(|i| i.viewport().close_requested()) && self.status.active && !self.close_confirmed {
+            ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            self.confirm_close = true;
+        }
+        if !self.status.active {
+            self.confirm_close = false;
+        }
+        if !self.confirm_close {
+            return;
+        }
+        let end = self.status.end.map(local_time);
+        let modal = egui::Modal::new(egui::Id::unique("confirm_close")).show(ctx, |ui| {
+            ui.set_width(340.0);
+            let mut keep = false;
+            ui.vertical_centered(|ui| {
+                ui.label(RichText::new("Fermer cette fenêtre ?").size(18.0).strong());
+                ui.add_space(8.0);
+                ui.label("Le dépannage continuera : la personne qui vous dépanne gardera l'accès à cet ordinateur.");
+                ui.add_space(4.0);
+                if let Some(end) = &end {
+                    ui.label(format!("Il s'arrêtera tout seul à {end}."));
+                }
+                ui.label("Pour l'arrêter avant, rouvrez « Dépannage à distance » depuis le menu.");
+                ui.add_space(12.0);
+                keep = big_button(ui, "Laisser la fenêtre ouverte", Some(ACCENT), true);
+                ui.add_space(8.0);
+                if big_button(ui, "Fermer la fenêtre", None, true) {
+                    self.close_confirmed = true;
+                    ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                }
+            });
+            keep
+        });
+        if modal.inner || modal.should_close() {
+            self.confirm_close = false;
+        }
+    }
+
     fn toasts_ui(&mut self, ctx: &egui::Context) {
         self.toasts.retain(|(_, since)| since.elapsed() < TOAST_TIME);
         if self.toasts.is_empty() {
@@ -484,6 +531,7 @@ impl eframe::App for App {
             Screen::Conversation => self.conversation_screen(ui),
         }
         self.toasts_ui(&ctx);
+        self.confirm_close_ui(&ctx);
         // Le compte à rebours et la disparition des messages
         ctx.request_repaint_after(Duration::from_secs(1));
     }

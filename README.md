@@ -45,7 +45,8 @@ La session lance sa propre instance de `tailscaled` avec l'état **en mémoire**
 dès qu'elle se déconnecte (ou peu après si l'ordinateur s'éteint). Aucune entrée morte ne
 s'accumule dans la console, le nom reste le même d'une session à l'autre, et rien n'est écrit
 sur le disque.
-L'arrêt est programmé par une minuterie systemd : il a lieu même si la fenêtre est fermée.
+L'arrêt est programmé par une minuterie systemd : il a lieu même si la fenêtre est fermée. Fermer
+la fenêtre pendant une session demande une confirmation, puisque le dépannage continue sans elle.
 Si l'ordinateur est éteint pendant une session, `packarch-depannage-cleanup.service` la
 termine au démarrage suivant. Aucun secret n'est stocké sur l'ordinateur : c'est la personne
 qui dépanne qui valide chaque connexion en ouvrant le lien.
