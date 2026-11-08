@@ -137,7 +137,64 @@ dans le tchat reste à confirmer avec l'utilisateur de cette machine (section 5)
 - **Couleur des dossiers** : `packarch-folder-color`.
 - **Journaux** : `journalctl -b -p warning --no-pager | tail -100`, `systemctl --failed`.
 
-## 5. Prudence
+## 5. Recettes validées
+
+### Polybar reste au-dessus d'un jeu Lutris (World of Warcraft…) — Openbox
+
+Symptôme : le jeu (Wine/Proton par Lutris) démarre sous les barres polybar, et ne passe
+devant qu'après avoir changé et appliqué une option graphique. Cause : sous Openbox, un dock
+reste au-dessus d'une fenêtre qui n'est pas à la fois plein écran et active ; Wine retire
+le plein écran pendant l'initialisation de l'affichage. Une règle `<fullscreen>` dans
+`rc.xml` ne suffit pas (appliquée trop tôt). Avec umu/Proton, la classe de la fenêtre est
+`steam_app_default` (pas `wow.exe`) : on cible donc le **titre exact** (WoW :
+`World of Warcraft`).
+
+Correctif (validé le 2026-11-08) : `packarch-game-fullscreen "TITRE" [SECONDES]`
+(packarch-openbox-settings ≥ 7.0-76) attend la fenêtre puis remet le plein écran et le focus
+plusieurs fois. On le déclare comme script de prélancement **non attendu** de l'entrée Lutris
+du jeu.
+
+1. `info` : vérifier que le bureau est Openbox (sous XFCE, autre problème).
+2. Mettre à jour : `pacman -Syu --noconfirm`, puis vérifier
+   `pacman -Q packarch-openbox-settings` (≥ 7.0-76) et `command -v packarch-game-fullscreen`.
+3. Lutris doit être **fermé** (sinon il réécrit sa config) :
+   `pgrep -u <user> -f lutris` vide ; sinon demander à la personne (tchat) de quitter
+   Lutris et le jeu.
+4. Trouver l'entrée du jeu (pour WoW : `exe` qui finit par `Wow.exe`) :
+   `grep -il 'wow.exe' /home/<user>/.local/share/lutris/games/*.yml`. S'il n'y a qu'une
+   entrée Battle.net (WoW lancé depuis le launcher), la prendre et mettre un délai long
+   (`3600`) : le jeu peut être lancé bien après le launcher.
+5. Sauvegarder puis ajouter l'option, en gardant le reste du fichier :
+
+   ```sh
+   ssh -o BatchMode=yes -o ConnectTimeout=15 root@$IP 'bash -s' <<'EOF'
+   F=/home/<user>/.local/share/lutris/games/<entree>.yml
+   cp "$F" "$F.avant-depannage"
+   python3 - "$F" <<'PY'
+   import sys, yaml
+   p = sys.argv[1]
+   d = yaml.safe_load(open(p)) or {}
+   s = d.setdefault("system", {}) or {}
+   d["system"] = s
+   s["prelaunch_command"] = '/usr/bin/packarch-game-fullscreen "World of Warcraft"'
+   s["prelaunch_wait"] = False
+   yaml.safe_dump(d, open(p, "w"), default_flow_style=False, allow_unicode=True)
+   PY
+   chown <user>: "$F" "$F.avant-depannage"
+   cat "$F"
+   EOF
+   ```
+
+6. Demander à la personne de lancer le jeu depuis Lutris : les barres peuvent rester
+   visibles une dizaine de secondes, puis le jeu passe devant. Vérifier si besoin par une
+   capture, ou `session-run 'wmctrl -lx'` + `session-run "xprop -id 0x… _NET_WM_STATE"`
+   (doit contenir `_NET_WM_STATE_FULLSCREEN`). Si le titre n'est pas trouvé, lire le vrai
+   titre dans `wmctrl -lx` pendant que le jeu tourne et corriger la commande.
+7. Dans le jeu, le mode d'affichage doit être « Plein écran » (pas « Fenêtré »).
+
+Autre jeu : même procédure avec son titre exact de fenêtre.
+
+## 6. Prudence
 
 - Expliquer à l'utilisateur ce qu'on va faire avant toute action lourde ou risquée
   (suppression de fichiers, désinstallation, modification du chargeur de démarrage, de
