@@ -10,13 +10,16 @@ use std::process::Command;
 
 /// Variables reprises de l'environnement du bureau
 const KEEP: &[&str] = &[
-    "DISPLAY", "XAUTHORITY", "DBUS_SESSION_BUS_ADDRESS", "XDG_RUNTIME_DIR", "XDG_CURRENT_DESKTOP",
+    "DISPLAY", "XAUTHORITY", "WAYLAND_DISPLAY", "SWAYSOCK", "I3SOCK",
+    "DBUS_SESSION_BUS_ADDRESS", "XDG_RUNTIME_DIR", "XDG_CURRENT_DESKTOP",
     "XDG_SESSION_DESKTOP", "XDG_SESSION_TYPE", "XDG_CONFIG_HOME", "XDG_DATA_DIRS", "DESKTOP_SESSION",
     "HOME", "USER", "LOGNAME", "SHELL", "LANG", "LC_ALL", "PATH",
 ];
 
-/// Processus « racines » d'un bureau, préférés pour lire l'environnement
-const SESSION_PROCS: &[&str] = &["xfce4-session", "openbox", "xfwm4", "polybar", "xfce4-panel"];
+/// Processus « racines » d'un bureau, préférés pour lire l'environnement.
+/// Sway : waybar ou mako, lancés par Sway (le processus sway n'a pas
+/// WAYLAND_DISPLAY ni SWAYSOCK, qu'il donne seulement à ses enfants)
+const SESSION_PROCS: &[&str] = &["xfce4-session", "openbox", "xfwm4", "polybar", "xfce4-panel", "waybar", "mako"];
 
 pub struct Desktop {
     pub user: String,
@@ -60,7 +63,7 @@ pub fn find() -> Option<Desktop> {
                 Some((k.to_string(), v.to_string()))
             })
             .collect();
-        if !env.contains_key("DISPLAY") {
+        if !env.contains_key("DISPLAY") && !env.contains_key("WAYLAND_DISPLAY") {
             continue;
         }
         let comm = fs::read_to_string(e.path().join("comm")).unwrap_or_default();
@@ -79,7 +82,42 @@ pub fn find() -> Option<Desktop> {
     if !kept.iter().any(|(k, _)| k == "PATH") {
         kept.push(("PATH".into(), "/usr/local/bin:/usr/bin".into()));
     }
-    Some(Desktop { user, uid, env: kept })
+    let mut d = Desktop { user, uid, env: kept };
+    wayland_fallback(&mut d);
+    Some(d)
+}
+
+/// Sway sans waybar ni mako (processus retenu sans WAYLAND_DISPLAY) : le
+/// socket Wayland et celui de Sway, retrouvés dans XDG_RUNTIME_DIR
+fn wayland_fallback(d: &mut Desktop) {
+    let desktop = d.get("XDG_CURRENT_DESKTOP").to_ascii_lowercase();
+    if !desktop.split(':').any(|x| x == "sway") {
+        return;
+    }
+    let run = match d.get("XDG_RUNTIME_DIR") {
+        "" => format!("/run/user/{}", d.uid),
+        r => r.to_string(),
+    };
+    let names: Vec<String> = fs::read_dir(&run)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .collect();
+    let prefix = format!("sway-ipc.{}.", d.uid);
+    let sway = names.iter().find(|n| n.starts_with(&prefix) && n.ends_with(".sock"));
+    let mut add = |key: &str, value: Option<String>| {
+        if d.get(key).is_empty()
+            && let Some(v) = value
+        {
+            d.env.push((key.to_string(), v));
+        }
+    };
+    let mut wayland: Vec<&String> =
+        names.iter().filter(|n| n.strip_prefix("wayland-").is_some_and(|s| s.chars().all(|c| c.is_ascii_digit()))).collect();
+    wayland.sort();
+    add("WAYLAND_DISPLAY", wayland.first().map(|s| s.to_string()));
+    add("SWAYSOCK", sway.map(|s| format!("{run}/{s}")));
 }
 
 /// packarch-depannage session-run COMMANDE… : la commande (passée à sh -c)
@@ -133,7 +171,11 @@ pub fn info() {
         Some(d) => {
             println!("Utilisateur    : {} (uid {}, {})", d.user, d.uid, d.get("HOME"));
             println!("Bureau         : {}", d.get("XDG_CURRENT_DESKTOP"));
-            println!("Écran          : {}", d.get("DISPLAY"));
+            match (d.get("WAYLAND_DISPLAY"), d.get("DISPLAY")) {
+                ("", x) => println!("Écran          : {x}"),
+                (w, "") => println!("Écran          : {w} (Wayland)"),
+                (w, x) => println!("Écran          : {w} (Wayland, Xwayland {x})"),
+            }
             let theme = output(
                 "runuser",
                 &["-u", &d.user, "--", "env", &format!("HOME={}", d.get("HOME")), &format!("XDG_CURRENT_DESKTOP={}", d.get("XDG_CURRENT_DESKTOP")), "packarch-skin", "current"],
