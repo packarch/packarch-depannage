@@ -56,7 +56,7 @@ ssh -n -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new
 Dans la suite, `root@packarch-NOM` désigne `root@$IP`.
 
 `info` donne : système, utilisateur connecté (et son dossier personnel), bureau (Openbox,
-XFCE ou Sway), écran (X11, ou Wayland sous Sway), thème packarch-skin, temps restant de la session. Le lire avant d'agir.
+XFCE ou labwc), écran (X11, ou Wayland sous labwc), thème packarch-skin, temps restant de la session. Le lire avant d'agir.
 Si la session finit bientôt (moins de 10 min) et que le travail est long, prévenir
 l'utilisateur pour que la personne clique sur « +1 h ».
 
@@ -93,8 +93,8 @@ pour toutes leurs fenêtres).
 ### Capture d'écran
 
 Capturer dans la session de l'utilisateur (en root, on ne voit pas son écran) : `maim` sous
-Openbox et XFCE, `grim` sous Sway (Wayland : `maim` n'y voit rien ; `session-run` donne
-`WAYLAND_DISPLAY` et `SWAYSOCK` depuis packarch-depannage 0.3.4). Rapatrier l'image et
+Openbox et XFCE, `grim` sous labwc (Wayland : `maim` n'y voit rien ; `session-run` donne
+`WAYLAND_DISPLAY` et `LABWC_PID` depuis packarch-depannage 0.3.5). Rapatrier l'image et
 l'effacer de son ordinateur :
 
 ```sh
@@ -134,11 +134,12 @@ dans le tchat reste à confirmer avec l'utilisateur de cette machine (section 5)
   `~/.config/openbox/themes/<thème>/polybar/config.ini` (barres, modules par barre :
   `modules-left/center/right`) ; relancer avec `session-run 'packarch-skin bar'`. Polices :
   `packarch-skin font`. Menus : `~/.config/openbox/menu-icons.xml` ou `menu-glyphs.xml`.
-- **Sway** : configuration dans `~/.config/sway` (`config`, `sway-theme`, `sway-output`,
-  `waybar/`, `rofi/`, `mako/`, `kitty/`), thème courant dans `~/.config/sway/.current_theme`.
-  Recharger : `session-run 'swaymsg reload'` (relance aussi waybar et mako) ; waybar seul :
-  `session-run 'pkill -USR2 -x waybar'`. Pas de `wmctrl`/`xprop` (Wayland) : fenêtres avec
-  `session-run 'swaymsg -t get_tree'`, fermer avec `swaymsg '[title="TITRE"] kill'`.
+- **labwc** : configuration dans `~/.config/labwc` (`rc.xml`, `menu.xml`, `autostart`,
+  `environment`, `themerc-override`, `packarch-theme`, `wallpaper`, `waybar/`, `rofi/`,
+  `mako/`, `kitty/`, `scripts/`), thème courant dans `~/.config/labwc/.current_theme`.
+  Recharger : `session-run 'labwc --reconfigure'` ; fond d'écran, waybar et mako :
+  `session-run '~/.config/labwc/scripts/startup'`. Pas de `wmctrl`/`xprop` (Wayland) ni
+  d'IPC : écrans avec `session-run 'wlr-randr'`.
   Copier-coller VM ↔ hôte impossible (spice-vdagent : X11 seulement).
 - **XFCE** : réglages dans xfconf (`session-run 'xfconf-query -c CANAL -l -v'`), tableau de
   bord `xfce4-panel` ; bouton des thèmes perdu : `session-run 'packarch-skin panel'`.
