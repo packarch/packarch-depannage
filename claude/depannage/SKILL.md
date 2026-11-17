@@ -56,7 +56,7 @@ ssh -n -o BatchMode=yes -o ConnectTimeout=15 -o StrictHostKeyChecking=accept-new
 Dans la suite, `root@packarch-NOM` désigne `root@$IP`.
 
 `info` donne : système, utilisateur connecté (et son dossier personnel), bureau (Openbox,
-XFCE ou labwc), écran (X11, ou Wayland sous labwc), thème packarch-skin, temps restant de la session. Le lire avant d'agir.
+XFCE, labwc ou Packarch), écran (X11, ou Wayland sous labwc et Packarch), thème packarch-skin, temps restant de la session. Le lire avant d'agir.
 Si la session finit bientôt (moins de 10 min) et que le travail est long, prévenir
 l'utilisateur pour que la personne clique sur « +1 h ».
 
@@ -93,7 +93,7 @@ pour toutes leurs fenêtres).
 ### Capture d'écran
 
 Capturer dans la session de l'utilisateur (en root, on ne voit pas son écran) : `maim` sous
-Openbox et XFCE, `grim` sous labwc (Wayland : `maim` n'y voit rien ; `session-run` donne
+Openbox et XFCE, `grim` sous labwc et Packarch (Wayland : `maim` n'y voit rien ; `session-run` donne
 `WAYLAND_DISPLAY` et `LABWC_PID` depuis packarch-depannage 0.3.5). Rapatrier l'image et
 l'effacer de son ordinateur :
 
@@ -141,6 +141,13 @@ dans le tchat reste à confirmer avec l'utilisateur de cette machine (section 5)
   `session-run '~/.config/labwc/scripts/startup'`. Pas de `wmctrl`/`xprop` (Wayland) ni
   d'IPC : écrans avec `session-run 'wlr-randr'`.
   Copier-coller VM ↔ hôte impossible (spice-vdagent : X11 seulement).
+- **Packarch** (compositeur `packarch`, `XDG_CURRENT_DESKTOP=packarch:wlroots`) : mêmes
+  fichiers que labwc, dans `~/.config/packarch` (`rc.xml` à la racine `<packarch_config>`),
+  thème courant dans `~/.config/packarch/.current_theme`. Recharger :
+  `session-run 'packarch --reconfigure'` ; fond d'écran, waybar et mako :
+  `session-run '~/.config/packarch/scripts/startup'`. Journal de la session :
+  `~/.local/state/packarch.log` (session précédente : `packarch.log.old`). Page de manuel :
+  `man packarch`. La session labwc reste disponible dans LightDM (`~/.config/labwc`).
 - **XFCE** : réglages dans xfconf (`session-run 'xfconf-query -c CANAL -l -v'`), tableau de
   bord `xfce4-panel` ; bouton des thèmes perdu : `session-run 'packarch-skin panel'`.
 - **Couleur des dossiers** : `packarch-folder-color`.

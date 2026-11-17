@@ -10,15 +10,16 @@ use std::process::Command;
 
 /// Variables reprises de l'environnement du bureau
 const KEEP: &[&str] = &[
-    "DISPLAY", "XAUTHORITY", "WAYLAND_DISPLAY", "LABWC_PID",
+    "DISPLAY", "XAUTHORITY", "WAYLAND_DISPLAY", "LABWC_PID", "PACKARCH_PID",
     "DBUS_SESSION_BUS_ADDRESS", "XDG_RUNTIME_DIR", "XDG_CURRENT_DESKTOP",
     "XDG_SESSION_DESKTOP", "XDG_SESSION_TYPE", "XDG_CONFIG_HOME", "XDG_DATA_DIRS", "DESKTOP_SESSION",
     "HOME", "USER", "LOGNAME", "SHELL", "LANG", "LC_ALL", "PATH",
 ];
 
 /// Processus « racines » d'un bureau, préférés pour lire l'environnement.
-/// labwc : waybar ou mako, lancés par labwc (le processus labwc n'a pas
-/// WAYLAND_DISPLAY ni LABWC_PID, qu'il donne seulement à ses enfants)
+/// labwc et Packarch : waybar ou mako, lancés par le compositeur (le
+/// processus labwc ou packarch n'a pas WAYLAND_DISPLAY ni LABWC_PID ou
+/// PACKARCH_PID, qu'il donne seulement à ses enfants)
 const SESSION_PROCS: &[&str] = &["xfce4-session", "openbox", "xfwm4", "polybar", "xfce4-panel", "waybar", "mako"];
 
 pub struct Desktop {
@@ -87,11 +88,11 @@ pub fn find() -> Option<Desktop> {
     Some(d)
 }
 
-/// labwc sans waybar ni mako (processus retenu sans WAYLAND_DISPLAY) : le
-/// socket Wayland, retrouvé dans XDG_RUNTIME_DIR
+/// labwc ou Packarch sans waybar ni mako (processus retenu sans
+/// WAYLAND_DISPLAY) : le socket Wayland, retrouvé dans XDG_RUNTIME_DIR
 fn wayland_fallback(d: &mut Desktop) {
     let desktop = d.get("XDG_CURRENT_DESKTOP").to_ascii_lowercase();
-    if !desktop.split(':').any(|x| x == "labwc") {
+    if !desktop.split(':').any(|x| x == "labwc" || x == "packarch") {
         return;
     }
     let run = match d.get("XDG_RUNTIME_DIR") {
