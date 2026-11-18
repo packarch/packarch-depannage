@@ -1,7 +1,7 @@
 # packarch-depannage
 
 Petit logiciel en Rust ([egui](https://github.com/emilk/egui)) pour le **dépannage à distance** d'un ordinateur
-[Packarch](https://github.com/packarch/CachyOS-Packarch) par une personne de confiance, en
+[Packarch](https://github.com/packarch/Packarch) par une personne de confiance, en
 ligne de commande, à travers [Tailscale](https://tailscale.com) et Tailscale SSH.
 
 ## Fonctionnement
