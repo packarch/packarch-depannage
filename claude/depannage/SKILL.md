@@ -138,7 +138,10 @@ dans le tchat reste à confirmer avec l'utilisateur de cette machine (section 5)
   `packarch-desktop-settings`, `XDG_CURRENT_DESKTOP=packarch:wlroots`) : configuration dans
   `~/.config/packarch` (`rc.xml` à la racine `<packarch_config>`, `menu.xml`, `autostart`,
   `environment`, `themerc-override`, `packarch-theme`, `wallpaper`, `waybar/`, `rofi/`,
-  `mako/`, `kitty/`, `scripts/`), thème courant dans `~/.config/packarch/.current_theme`. Recharger :
+  `mako/`, `scripts/`), thème courant dans `~/.config/packarch/.current_theme`. Terminal Ghostty
+  (bureaux Packarch et Openbox, depuis le 2026-11-19) : `~/.config/ghostty/config`, qui inclut
+  `colors` et `fonts` (écrits par packarch-skin), rechargé par `pkill -USR2 -x ghostty` (jamais un
+  autre signal : il le ferme) ; kitty (`~/.config/packarch/kitty`) sur les comptes plus anciens. Recharger :
   `session-run 'packarch --reconfigure'` ; fond d'écran, waybar et mako :
   `session-run '~/.config/packarch/scripts/startup'`. Journal de la session :
   `~/.local/state/packarch.log` (session précédente : `packarch.log.old`). Page de manuel :
