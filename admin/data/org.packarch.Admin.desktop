@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Packarch Admin
+Comment=Repair the Packarch computers of your relatives remotely
+Comment[fr]=Dépanner à distance les ordinateurs Packarch de vos proches
+Exec=packarch-admin
+Icon=preferences-desktop-remote-desktop
+Terminal=false
+Categories=System;
+Keywords=help;remote;support;ssh;tailscale;dépannage;aide;distance;admin;
+StartupNotify=true

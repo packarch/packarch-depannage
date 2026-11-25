@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Packarch Admin (tray)
+Name[fr]=Packarch Admin (zone de notification)
+Comment=Tells when a computer is waiting for remote help
+Comment[fr]=Prévient quand un ordinateur attend un dépannage
+Exec=packarch-admin --tray
+Icon=preferences-desktop-remote-desktop
+Terminal=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true

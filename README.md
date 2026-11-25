@@ -1,8 +1,21 @@
 # packarch-depannage
 
-Petit logiciel en Rust ([egui](https://github.com/emilk/egui)) pour le **dépannage à distance** d'un ordinateur
+Petit logiciel en C++ ([Qt 6](https://www.qt.io)) pour le **dépannage à distance** d'un ordinateur
 [Packarch](https://github.com/packarch/Packarch) par une personne de confiance, en
 ligne de commande, à travers [Tailscale](https://tailscale.com) et Tailscale SSH.
+
+Deux programmes, dans ce dépôt :
+
+- **packarch-depannage** (Packarch Dépannage), installé avec Packarch sur l'ordinateur à
+  dépanner : il ne contient que ce qu'il faut pour être dépanné ;
+- **packarch-admin** (Packarch Admin, dossier `admin`), pour la personne qui dépanne, sur son
+  ordinateur seulement.
+
+Ils ne se parlent que par des commandes lancées en Tailscale SSH sur l'ordinateur dépanné
+(`packarch-depannage info`, `session-run`, `chat-follow`, `chat-say`) : ils peuvent être de
+versions différentes (`common` : ce qu'ils partagent, le format du tchat surtout).
+Jusqu'à la version 0.3.7 (tag `v0.3.7`), le projet était en Rust (egui) et tenait en un seul
+programme.
 
 ## Fonctionnement
 
@@ -27,15 +40,69 @@ ligne de commande, à travers [Tailscale](https://tailscale.com) et Tailscale SS
 ## Tchat
 
 Dès que l'ordinateur est connecté, sa fenêtre affiche un tchat. La personne qui dépanne ouvre
-elle aussi **Packarch Dépannage**, clique sur « Dépanner quelqu'un » (il lui faut Tailscale
-connecté à son réseau et `packarch-depannage` à jour) et choisit l'ordinateur dans la liste :
-aucune commande à taper. Une notification signale un message si la fenêtre n'est pas au premier
+**Packarch Admin** (il lui faut Tailscale connecté à son réseau) et choisit l'ordinateur dans
+la liste : le tchat est à droite de sa page, aucune commande à taper. Une notification signale un message si la fenêtre n'est pas au premier
 plan ; si la personne dépannée a fermé la sienne, un message reçu la rouvre.
 
-L'ordinateur dépanné ne pouvant joindre personne, c'est la fenêtre de la personne qui dépanne
+L'ordinateur dépanné ne pouvant joindre personne, c'est Packarch Admin, chez la personne qui dépanne,
 qui vient lire et écrire les messages par Tailscale SSH. Ils sont dans
 `/run/packarch-depannage/chat.jsonl` : en mémoire, effacés à la fin de la session. Tant que le
 tchat est ouvert de son côté, l'ordinateur dépanné affiche « Dépannage en cours ».
+
+## Packarch Admin (personne qui dépanne)
+
+La fenêtre liste les ordinateurs à dépanner du réseau Tailscale. La page d'un ordinateur a,
+à gauche, des **terminaux intégrés** en onglets et, à droite, le tchat avec la personne :
+
+- « Terminal (root) » : une session root sur l'ordinateur (Tailscale SSH), pour intervenir
+  soi-même ; autant d'onglets que voulu, Ctrl+Maj+C et Ctrl+Maj+V pour copier et coller ;
+- « Dépanner avec Claude Code » : [Claude Code](https://claude.com/claude-code), s'il est
+  installé, avec la demande « Ouvre un dépannage sur packarch-<nom> ».
+
+Fermer la fenêtre la **réduit dans la zone de notification** : les terminaux et le tchat
+continuent, un clic sur l'icône la rouvre telle quelle (« Quitter » est dans le menu de
+l'icône, qui liste aussi les ordinateurs). L'icône est lancée à l'ouverture du bureau et
+change quand un ordinateur attend. Dès qu'un ordinateur apparaît dans le réseau (le lien vient
+d'être validé), une notification « Dépannage : packarch-<nom> » s'affiche et reste à l'écran ;
+un clic dessus ouvre la fenêtre sur cet ordinateur. Plusieurs ordinateurs peuvent être
+dépannés en même temps, chacun a sa page et sa notification.
+
+Rien n'est envoyé nulle part : Packarch Admin relit l'état du Tailscale de l'ordinateur. Le
+nom d'un ordinateur vient de cet ordinateur : s'il n'a pas la forme que lui donne
+packarch-depannage (minuscules, chiffres, tirets), il n'est jamais repris dans la demande à
+Claude Code.
+
+```
+packarch-admin                 fenêtre (une seule instance : la rouvre si elle est réduite)
+packarch-admin --tray          démarre réduit dans la zone de notification
+packarch-admin --essai NOM     essai de la notification, comme si NOM arrivait
+```
+
+## Clé de connexion : le lien, une seule fois
+
+Sans réglage, la personne dépannée envoie le lien à chaque session. Pour qu'elle n'ait à le
+faire que la première fois, la personne qui dépanne crée un client OAuth dans la console
+Tailscale (**Settings → Trust credentials → Credential**, type OAuth, droit **Auth Keys** en
+écriture, tag `tag:depannage`) et enregistre son secret, sur son ordinateur seulement :
+
+```sh
+install -Dm600 /dev/null ~/.config/packarch-admin/tailscale-oauth
+$EDITOR ~/.config/packarch-admin/tailscale-oauth      # le secret tskey-client-…, sur une ligne
+```
+
+À chaque dépannage, Packarch Admin crée alors une clé d'autorisation Tailscale propre à
+l'ordinateur (90 jours, le maximum de Tailscale ; machine éphémère, tag `tag:depannage`
+seulement) et la dépose chez lui par Tailscale SSH (`packarch-depannage key-set`, dans
+`/var/lib/packarch-depannage/authkey`, lisible par root seul). La clé précédente de
+l'ordinateur est révoquée. Aux sessions suivantes, « Autoriser le dépannage » (toujours avec le
+mot de passe de la personne) connecte l'ordinateur tout seul, et la personne qui dépanne est
+prévenue par l'icône.
+
+Si la clé a expiré (plus de 90 jours sans dépannage), a été révoquée, ou si l'ordinateur n'en
+a jamais reçu, la session retombe sur le lien : rien n'est bloqué. Une clé ne donne à
+l'ordinateur que ce que lui donnait le lien validé : entrer dans le réseau comme machine
+`tag:depannage`, qui n'y atteint rien. Elle se révoque dans la console Tailscale
+(**Settings → Keys**).
 
 ## Fin de session et traces
 
@@ -48,8 +115,8 @@ sur le disque.
 L'arrêt est programmé par une minuterie systemd : il a lieu même si la fenêtre est fermée. Fermer
 la fenêtre pendant une session demande une confirmation, puisque le dépannage continue sans elle.
 Si l'ordinateur est éteint pendant une session, `packarch-depannage-cleanup.service` la
-termine au démarrage suivant. Aucun secret n'est stocké sur l'ordinateur : c'est la personne
-qui dépanne qui valide chaque connexion en ouvrant le lien.
+termine au démarrage suivant. Sans clé de connexion (voir plus haut), aucun secret n'est stocké sur
+l'ordinateur : c'est la personne qui dépanne qui valide chaque connexion en ouvrant le lien.
 
 Si Tailscale est déjà utilisé sur l'ordinateur pour autre chose, le dépannage refuse de
 démarrer (il n'y touche pas).
@@ -120,8 +187,9 @@ règles de prudence (accord avant toute action risquée, pas de redémarrage, ne
 Tailscale sur l'ordinateur dépanné). Il suffit alors de demander, par exemple : « connecte-toi
 à packarch-maman et mets à jour le système ».
 
-Installation, sur l'ordinateur de la personne qui dépanne (avec Tailscale connecté à son
-réseau) : un lien vers le dossier du dépôt, pour que les mises à jour du dépôt s'appliquent.
+Le paquet `packarch-admin` l'installe : au lancement, Packarch Admin la lie dans
+`~/.claude/skills/depannage` si Claude Code est utilisé sur l'ordinateur et qu'aucune
+compétence de ce nom n'y est déjà. Depuis les sources :
 
 ```sh
 mkdir -p ~/.claude/skills
@@ -130,17 +198,38 @@ ln -s "$PWD/claude/depannage" ~/.claude/skills/depannage
 
 ## Construction
 
+Qt 6 (Widgets, Network), CMake, et [QTermWidget](https://github.com/lxqt/qtermwidget) pour
+packarch-admin.
+
 ```sh
-cargo build --release
+cmake -B build -DCMAKE_INSTALL_PREFIX=/usr
+cmake --build build
+ctest --test-dir build
 ```
 
-Fichiers à installer (paquet `packarch-depannage` de
-[myrepo-pkgs](https://github.com/packarch/myrepo-pkgs)) : le binaire dans `/usr/bin`,
-`data/org.packarch.Depannage.desktop`, `data/org.packarch.depannage.policy` (polkit) et
-`data/packarch-depannage-cleanup.service` (activé). Dépendances : `tailscale`, `polkit`,
-`openssh` (tchat de la personne qui dépanne), `libnotify` et `wmctrl` (fenêtre), et ce
-qu'egui charge au démarrage (`libglvnd`, `libxkbcommon`, `libx11`, `libxcursor`, `libxi`,
-`libxrandr`). Jusqu'à la version 0.2.2 (tag `v0.2.2`), la fenêtre était en GTK4/libadwaita.
+`-DBUILD_ADMIN=OFF` ne construit que packarch-depannage (sans QTermWidget),
+`-DBUILD_DEPANNAGE=OFF` que packarch-admin.
+
+Sur une distribution optimisée pour un processeur récent (CachyOS v3, v4, znver4…), le binaire
+hérite d'un marqueur de la glibc et refuse de démarrer sur un processeur plus ancien (« CPU
+ISA level is lower than required »). Pour le distribuer, lier avec lld
+(`-DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld`) ; `readelf -n build/packarch-depannage | grep ISA`
+ne doit rien afficher.
+
+Deux paquets, dans [myrepo-pkgs](https://github.com/packarch/myrepo-pkgs).
+
+**packarch-depannage** : le binaire dans `/usr/bin`, `org.packarch.Depannage.desktop`,
+`org.packarch.depannage.policy` (polkit) et `packarch-depannage-cleanup.service` (à activer).
+Dépendances : `qt6-base`, `tailscale`, `polkit`, `libnotify`, `util-linux` (runuser).
+
+**packarch-admin** : le binaire dans `/usr/bin`, `org.packarch.Admin.desktop`,
+`packarch-admin-tray.desktop` dans `/etc/xdg/autostart` (l'icône à l'ouverture du bureau) et
+la compétence `claude/depannage` (dans `/usr/share/packarch-admin/claude`, liée au lancement
+dans `~/.claude/skills` si Claude Code est utilisé et qu'elle n'y est pas). Dépendances :
+`qt6-base`, `qtermwidget`, `tailscale`, `openssh`, `libnotify` ; en option Claude Code.
+
+Les deux programmes ont la même version, celle du tag du dépôt ; chaque paquet prend son
+composant d'installation (`cmake --install build --component depannage` ou `admin`).
 
 ## Licence
 
