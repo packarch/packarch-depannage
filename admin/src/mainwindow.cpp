@@ -10,6 +10,7 @@
 #include <QLabel>
 #include <QListWidget>
 #include <QMenu>
+#include <QMessageBox>
 #include <QProcess>
 #include <QSplitter>
 #include <QStackedWidget>
@@ -51,7 +52,9 @@ MainWindow::MainWindow(QWidget* parent)
     splitter->setStretchFactor(1, 1);
     splitter->setSizes({190, 1090});
     setCentralWidget(splitter);
-    connect(list_, &QListWidget::currentTextChanged, this, &MainWindow::select);
+    connect(list_, &QListWidget::currentItemChanged, this, [this](QListWidgetItem* item) {
+        select(item ? item->data(Qt::UserRole).toString() : QString());
+    });
 
     if (QSystemTrayIcon::isSystemTrayAvailable()) {
         tray_ = new QSystemTrayIcon(icon(false), this);
@@ -70,7 +73,6 @@ MainWindow::MainWindow(QWidget* parent)
 
     connect(tailnet_, &Tailnet::polled, this, &MainWindow::refresh);
     connect(tailnet_, &Tailnet::arrived, this, &MainWindow::announce);
-    connect(tailnet_, &Tailnet::gone, this, &MainWindow::forget);
     // À chaque dépannage : le nom sous lequel on se présente à la personne
     connect(tailnet_, &Tailnet::arrived, this, [this](const Machine& m) { chat::announceHelper(m, this); });
     // et une clé de connexion neuve pour l'ordinateur
@@ -79,8 +81,10 @@ MainWindow::MainWindow(QWidget* parent)
         keyStatus_.insert(host, text);
         // Aussi dans le journal : la fenêtre peut être réduite
         qInfo().noquote() << u"%1 — %2"_s.arg(host, text);
-        if (MachinePage* page = open_.value(host))
-            page->setKeyStatus(text);
+        for (MachinePage* page : std::as_const(open_)) {
+            if (page->machine().host == host && !page->gone())
+                page->setKeyStatus(text);
+        }
     });
     refresh();
     tailnet_->start();
@@ -96,52 +100,55 @@ QString MainWindow::summary() const {
     }
 }
 
-void MainWindow::closePage(const QString& host) {
-    MachinePage* page = open_.take(host);
+QString MainWindow::sessionKey(const Machine& machine) {
+    // Une session : un nom et l'adresse que Tailscale lui a donnée (neuve à chaque session)
+    return machine.host + u'|' + machine.ip;
+}
+
+void MainWindow::closePage(const QString& key) {
+    MachinePage* page = open_.take(key);
     if (!page)
         return;
     pages_->removeWidget(page);
     page->deleteLater();
+    refresh();
 }
 
 void MainWindow::refresh() {
     const QList<Machine>& machines = tailnet_->machines();
 
-    // Pages d'une session finie. L'ordinateur est revenu (nouvelle session, donc
-    // nouvelle adresse) : sa page est remplacée, l'ancienne ne joindrait plus
-    // rien. Il est parti : sa page reste tant qu'elle est à l'écran (ce que les
-    // terminaux affichent), puis disparaît.
-    const QString shownHost = list_->currentItem() ? list_->currentItem()->text() : QString();
-    for (const QString& host : open_.keys()) {
-        const auto it = std::ranges::find(machines, host, &Machine::host);
-        if (it != machines.cend() && it->ip != open_.value(host)->machine().ip) {
-            closePage(host);
-            if (host == shownHost)
-                select(host);
-        } else if (it == machines.cend() && open_.value(host)->gone() && host != shownHost) {
-            closePage(host);
-        }
+    // Sessions en cours, et pages de sessions finies : une page n'est jamais
+    // fermée toute seule (un terminal, Claude Code peuvent encore servir, pour
+    // refaire ici ce qui a été fait là-bas) ; c'est l'utilisateur qui la ferme.
+    QStringList keys;
+    QStringList labels;
+    for (const Machine& m : machines) {
+        keys << sessionKey(m);
+        labels << tailnet::shownHost(m.host);
     }
-
-    // Liste : les ordinateurs présents, et ceux dont la page est encore ouverte
-    QStringList hosts;
-    for (const Machine& m : machines)
-        hosts << m.host;
+    const qsizetype live = keys.size();
     for (auto it = open_.cbegin(); it != open_.cend(); ++it) {
-        if (!hosts.contains(it.key()))
-            hosts << it.key();
+        if (keys.contains(it.key()))
+            continue;
+        // Partie, ou revenue pour une nouvelle session : cette page ne joint plus rien
+        it.value()->setGone();
+        keys << it.key();
+        labels << u"%1 (terminée)"_s.arg(tailnet::shownHost(it.value()->machine().host));
     }
     QStringList shown;
     for (int i = 0; i < list_->count(); ++i)
-        shown << list_->item(i)->text();
-    if (shown != hosts) {
-        const QString current = list_->currentItem() ? list_->currentItem()->text() : QString();
+        shown << list_->item(i)->data(Qt::UserRole).toString();
+    if (shown != keys) {
+        const QString current = list_->currentItem() ? list_->currentItem()->data(Qt::UserRole).toString() : QString();
         const QSignalBlocker blocker(list_);
         list_->clear();
-        list_->addItems(hosts);
-        for (int i = 0; i < list_->count(); ++i)
-            list_->item(i)->setIcon(icon(true));
-        const int row = hosts.indexOf(current);
+        for (qsizetype i = 0; i < keys.size(); ++i) {
+            auto* item = new QListWidgetItem(icon(i < live), labels[i], list_);
+            item->setData(Qt::UserRole, keys[i]);
+            if (i >= live)
+                item->setForeground(palette().color(QPalette::Disabled, QPalette::Text));
+        }
+        const int row = static_cast<int>(keys.indexOf(current));
         if (row >= 0)
             list_->setCurrentRow(row);
         else
@@ -185,39 +192,48 @@ void MainWindow::refresh() {
     });
 }
 
-void MainWindow::select(const QString& host) {
-    if (host.isEmpty()) {
+void MainWindow::select(const QString& key) {
+    if (key.isEmpty()) {
         pages_->setCurrentWidget(empty_);
         return;
     }
-    MachinePage* page = open_.value(host);
+    MachinePage* page = open_.value(key);
     if (!page) {
         const QList<Machine>& machines = tailnet_->machines();
-        const auto it = std::ranges::find(machines, host, &Machine::host);
+        const auto it = std::ranges::find_if(machines, [&key](const Machine& m) { return sessionKey(m) == key; });
         if (it == machines.cend())
             return;
         page = new MachinePage(*it);
         page->setKeyStatus(keyStatus_.value(
-            host, KeyProvisioner::configured() ? QString() : u"Sans clé de connexion : le lien sera demandé à chaque session."_s));
+            it->host, KeyProvisioner::configured() ? QString() : u"Sans clé de connexion : le lien sera demandé à chaque session."_s));
         connect(page, &MachinePage::userMessage, this, &MainWindow::notifyMessage);
+        connect(page, &MachinePage::closeRequested, this, [this, key, page] {
+            // Ses terminaux s'arrêtent avec elle : pas par mégarde
+            const auto answer = QMessageBox::question(
+                this, TITLE,
+                u"Fermer la page de %1 ?\n\nSes terminaux, Claude Code compris, seront arrêtés."_s.arg(
+                    tailnet::shownHost(page->machine().host)),
+                QMessageBox::Close | QMessageBox::Cancel, QMessageBox::Cancel);
+            if (answer == QMessageBox::Close)
+                closePage(key);
+        });
         pages_->addWidget(page);
-        open_.insert(host, page);
+        open_.insert(key, page);
     }
     pages_->setCurrentWidget(page);
 }
 
-void MainWindow::forget(const QString& host) {
-    // La page reste (ce qui est affiché dans les terminaux, le tchat) ; elle sait
-    // seulement que la session est terminée. Elle disparaît avec la fenêtre.
-    if (MachinePage* page = open_.value(host))
-        page->setGone();
-}
-
 void MainWindow::showMachine(const QString& host) {
     if (!host.isEmpty()) {
-        const auto items = list_->findItems(host, Qt::MatchExactly);
-        if (!items.isEmpty())
-            list_->setCurrentItem(items.first());
+        // La session en cours de cet ordinateur (pas une page d'une session finie)
+        for (const Machine& m : tailnet_->machines()) {
+            if (m.host != host)
+                continue;
+            for (int i = 0; i < list_->count(); ++i) {
+                if (list_->item(i)->data(Qt::UserRole).toString() == sessionKey(m))
+                    list_->setCurrentRow(i);
+            }
+        }
     }
     show();
     setWindowState(windowState() & ~Qt::WindowMinimized);

@@ -108,6 +108,11 @@ relit, « Copier » les met dans le presse-papiers. Elles sont lues par un scrip
 Admin envoyé par Tailscale SSH (`admin/data/infos.sh`, qui ne fait que lire) : rien n'est
 installé sur l'ordinateur, et toutes les versions de packarch-depannage conviennent.
 
+Une page vaut pour une session : quand la personne rouvre un dépannage, son ordinateur
+revient dans la liste et l'ancienne page reste, marquée « (terminée) », avec ses onglets (un
+Claude Code qui doit encore refaire ici ce qu'il a fait là-bas, par exemple). Aucune page ne
+se ferme toute seule : « Fermer la page », après confirmation, arrête ses terminaux.
+
 Fermer la fenêtre la **réduit dans la zone de notification** : les terminaux et le tchat
 continuent, un clic sur l'icône la rouvre telle quelle (« Quitter » est dans le menu de
 l'icône, qui liste aussi les ordinateurs). L'icône est lancée à l'ouverture du bureau et

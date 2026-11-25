@@ -26,6 +26,9 @@ void announceHelper(const Machine& machine, QObject* parent);
 /// est décochée, quand la page se ferme ou à la fin de la session du bureau
 /// (dossier d'exécution). Vide si le nom de l'ordinateur est inattendu.
 QString assistantFlag(const QString& host);
+/// L'assistant est autorisé pour la session de HOST à l'adresse IP (le fichier porte
+/// l'adresse de la session autorisée)
+bool assistantAllowed(const QString& host, const QString& ip);
 /// Retire toutes ces autorisations : au lancement, aucune case n'est cochée (une
 /// autorisation restée d'un arrêt brutal ne vaut plus)
 void clearAssistantFlags();

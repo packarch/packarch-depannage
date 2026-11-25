@@ -30,10 +30,11 @@ protected:
 
 private:
     void refresh();
-    void select(const QString& host);
-    void forget(const QString& host);
-    /// Ferme la page de HOST (terminaux et tchat compris)
-    void closePage(const QString& host);
+    /// Les pages sont rangées par session (nom et adresse de l'ordinateur)
+    static QString sessionKey(const Machine& machine);
+    void select(const QString& key);
+    /// Ferme une page (terminaux et tchat compris)
+    void closePage(const QString& key);
     void notifyMessage(const QString& host, const QString& text);
     QString summary() const;
 

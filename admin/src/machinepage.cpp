@@ -92,6 +92,13 @@ MachinePage::MachinePage(Machine machine, QWidget* parent)
     connect(refreshInfo_, &QPushButton::clicked, this, &MachinePage::fetchInfo);
     connect(copyInfo_, &QPushButton::clicked, this, [this] { QApplication::clipboard()->setText(infoText_); });
 
+    // Session finie : la page reste, pour relire et pour ses terminaux, jusqu'à sa fermeture
+    ended_ = new QLabel(u"Session de dépannage terminée : cette page ne joint plus l'ordinateur."_s);
+    ended_->setAlignment(Qt::AlignCenter);
+    ended_->setWordWrap(true);
+    ended_->setStyleSheet(u"background: #464646; color: white; padding: 6px; border-radius: 4px;"_s);
+    ended_->hide();
+    homeLayout->addWidget(ended_);
     homeLayout->addWidget(title);
     homeLayout->addWidget(address);
     homeLayout->addLayout(actions);
@@ -100,6 +107,11 @@ MachinePage::MachinePage(Machine machine, QWidget* parent)
     homeLayout->addLayout(infoBar);
     homeLayout->addWidget(info_, 1);
     tabs_->addTab(home, u"Ordinateur"_s);
+    auto* close = new QPushButton(u"Fermer la page"_s);
+    close->setFlat(true);
+    close->setToolTip(u"Ferme cette page : ses terminaux, Claude Code compris, s'arrêtent."_s);
+    connect(close, &QPushButton::clicked, this, &MachinePage::closeRequested);
+    tabs_->setCornerWidget(close, Qt::TopRightCorner);
     tabs_->tabBar()->setTabButton(0, QTabBar::RightSide, nullptr);
     tabs_->tabBar()->setTabButton(0, QTabBar::LeftSide, nullptr);
     connect(root, &QPushButton::clicked, this, &MachinePage::openRootTerminal);
@@ -130,13 +142,13 @@ MachinePage::MachinePage(Machine machine, QWidget* parent)
     inputRow->addWidget(send_);
     chatLayout->addWidget(chatTitle);
     // Sans cette case, l'assistant ne lit pas le tchat et n'y écrit pas
-    auto* assistant = new QCheckBox(u"Claude peut lire le tchat et y écrire"_s);
-    assistant->setToolTip(u"Décochée : Claude Code ne lit pas le tchat et n'écrit pas à la personne.\n"
+    assistant_ = new QCheckBox(u"Claude peut lire le tchat et y écrire"_s);
+    assistant_->setToolTip(u"Décochée : Claude Code ne lit pas le tchat et n'écrit pas à la personne.\n"
                           "Cochée : il suit ses messages et lui répond, sous le nom « Claude »."_s);
-    assistant->setEnabled(!chat::assistantFlag(machine_.host).isEmpty());
-    connect(assistant, &QCheckBox::toggled, this, &MachinePage::allowAssistant);
+    assistant_->setEnabled(!chat::assistantFlag(machine_.host).isEmpty());
+    connect(assistant_, &QCheckBox::toggled, this, &MachinePage::allowAssistant);
     chatLayout->addWidget(banner_);
-    chatLayout->addWidget(assistant);
+    chatLayout->addWidget(assistant_);
     chatLayout->addWidget(log_, 1);
     chatLayout->addLayout(inputRow);
     connect(send_, &QPushButton::clicked, this, &MachinePage::sendInput);
@@ -183,8 +195,15 @@ MachinePage::MachinePage(Machine machine, QWidget* parent)
 }
 
 void MachinePage::setGone() {
+    if (gone_)
+        return;
     gone_ = true;
     chat_->setGone();
+    ended_->show();
+    // L'assistant n'a plus personne à qui parler par cette page
+    assistant_->setChecked(false);
+    assistant_->setEnabled(false);
+    refreshInfo_->setEnabled(false);
 }
 
 void MachinePage::showInfoMessage(const QString& text) {
@@ -299,12 +318,14 @@ void MachinePage::allowAssistant(bool allowed) {
     const QString flag = chat::assistantFlag(machine_.host);
     if (flag.isEmpty())
         return;
+    // Le fichier porte l'adresse de la session : l'autorisation vaut pour elle seule
     if (allowed) {
         QDir().mkpath(QFileInfo(flag).path());
         QFile f(flag);
         if (f.open(QIODevice::WriteOnly))
             f.write(machine_.ip.toUtf8() + '\n');
-    } else {
+    } else if (chat::assistantAllowed(machine_.host, machine_.ip)) {
+        // Seulement la nôtre : pas celle d'une nouvelle session du même ordinateur
         QFile::remove(flag);
     }
 }

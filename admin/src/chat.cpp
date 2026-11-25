@@ -1,6 +1,7 @@
 #include "chat.hpp"
 
 #include <QDir>
+#include <QFile>
 #include <QProcess>
 #include <QStandardPaths>
 #include <QTimer>
@@ -70,6 +71,11 @@ QString assistantFlag(const QString& host) {
     if (!tailnet::validHost(host))
         return {};
     return u"%1/packarch-admin/tchat-claude/%2"_s.arg(QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation), host);
+}
+
+bool assistantAllowed(const QString& host, const QString& ip) {
+    QFile f(assistantFlag(host));
+    return !ip.isEmpty() && f.open(QIODevice::ReadOnly) && QString::fromUtf8(f.read(100)).trimmed() == ip;
 }
 
 void clearAssistantFlags() {

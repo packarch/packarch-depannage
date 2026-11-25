@@ -9,6 +9,7 @@
 class QLabel;
 class QLineEdit;
 class ChatView;
+class QCheckBox;
 class QPushButton;
 class QTabWidget;
 class QTreeWidget;
@@ -27,6 +28,8 @@ public:
     void setKeyStatus(const QString& text);
 
 signals:
+    /// L'utilisateur demande la fermeture de la page
+    void closeRequested();
     /// Message de la personne, reçu en direct (notification si la fenêtre est cachée)
     void userMessage(const QString& host, const QString& text);
 
@@ -49,6 +52,8 @@ private:
     QTabWidget* tabs_;
     QLabel* banner_;
     QLabel* keyStatus_;
+    QCheckBox* assistant_;
+    QLabel* ended_;
     /// Infos de l'ordinateur (système, matériel…)
     QTreeWidget* info_;
     QPushButton* refreshInfo_;

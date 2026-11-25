@@ -29,11 +29,6 @@ void say(const QString& line) {
     QTextStream(stdout) << line << Qt::endl;
 }
 
-bool allowed(const QString& host) {
-    const QString flag = chat::assistantFlag(host);
-    return !flag.isEmpty() && QFile::exists(flag);
-}
-
 /// Adresse Tailscale de HOST, s'il est en ligne et porte le tag du dépannage
 QString address(const QString& host) {
     const auto status = tailscale::status();
@@ -58,18 +53,18 @@ QStringList sshTo(const QString& ip, const QString& command) {
 /// Suit le tchat de HOST tant que la case est cochée
 class Follower : public QObject {
 public:
-    explicit Follower(QString host) : host_(std::move(host)) {
+    explicit Follower(QString host) : host_(std::move(host)), ip_(address(host_)) {
         auto* timer = new QTimer(this);
         connect(timer, &QTimer::timeout, this, &Follower::check);
         timer->start(POLL_MS);
-        if (!allowed(host_))
+        if (!chat::assistantAllowed(host_, ip_))
             say(u"[tchat interdit : la case « Claude peut lire le tchat et y écrire » n'est pas cochée ; en attente]"_s);
         check();
     }
 
 private:
     void check() {
-        const bool now = allowed(host_);
+        const bool now = chat::assistantAllowed(host_, ip_);
         if (now == allowed_)
             return;
         allowed_ = now;
@@ -85,9 +80,11 @@ private:
     void start() {
         if (ssh_ || !allowed_)
             return;
+        // Toujours la session du lancement : une nouvelle session du même ordinateur
+        // (nouvelle adresse) est une autre conversation, pour un autre onglet
         const QString ip = address(host_);
-        if (ip.isEmpty()) {
-            say(u"[%1 n'est plus dans le réseau : la session de dépannage est terminée]"_s.arg(host_));
+        if (ip.isEmpty() || ip != ip_) {
+            say(u"[la session de dépannage de %1 est terminée]"_s.arg(host_));
             QCoreApplication::exit(0);
             return;
         }
@@ -147,6 +144,8 @@ private:
     }
 
     QString host_;
+    /// Adresse de l'ordinateur au lancement : celle de la session suivie
+    QString ip_;
     bool allowed_ = false;
     QProcess* ssh_ = nullptr;
     QByteArray buffer_;
@@ -156,7 +155,8 @@ private:
 
 int sayTo(const QString& host) {
     QTextStream err(stderr);
-    if (!allowed(host)) {
+    const QString ip = address(host);
+    if (!chat::assistantAllowed(host, ip)) {
         err << u"packarch-admin : tchat interdit (la case « Claude peut lire le tchat et y écrire » n'est pas cochée) : rien n'est envoyé\n"_s;
         return 3;
     }
@@ -165,11 +165,6 @@ int sayTo(const QString& host) {
     if (text.isEmpty()) {
         err << u"packarch-admin : message vide\n"_s;
         return 2;
-    }
-    const QString ip = address(host);
-    if (ip.isEmpty()) {
-        err << u"packarch-admin : %1 n'est pas dans le réseau\n"_s.arg(host);
-        return 1;
     }
     QProcess ssh;
     ssh.setProcessChannelMode(QProcess::ForwardedErrorChannel);
