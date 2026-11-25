@@ -73,6 +73,10 @@ private slots:
         QCOMPARE(a.update({caro}, 1070 + Arrivals::FORGET_SECS).arrived, QList<Machine>{caro});
         // Longue pause de la veille : un ordinateur toujours là n'est pas annoncé de nouveau
         QVERIFY(a.update({caro}, 1070 + 20 * Arrivals::FORGET_SECS).arrived.isEmpty());
+        // Session arrêtée puis rouverte aussitôt : même nom, nouvelle adresse, donc nouvelle arrivée
+        const Machine again{u"packarch-caro"_s, u"100.1.1.77"_s};
+        QCOMPARE(a.update({again}, 1080 + 20 * Arrivals::FORGET_SECS).arrived, QList<Machine>{again});
+        QVERIFY(a.update({again}, 1085 + 20 * Arrivals::FORGET_SECS).arrived.isEmpty());
     }
 
 };

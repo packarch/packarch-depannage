@@ -19,6 +19,7 @@ public:
     const Machine& machine() const { return machine_; }
     /// L'ordinateur a quitté le réseau
     void setGone();
+    bool gone() const { return gone_; }
     /// Où en est la clé de connexion de l'ordinateur (vide : rien à dire)
     void setKeyStatus(const QString& text);
 
@@ -44,6 +45,7 @@ private:
     QLineEdit* input_;
     QPushButton* send_;
     int terminals_ = 0;
+    bool gone_ = false;
     /// L'historique est arrivé : les messages suivants sont nouveaux
     bool live_ = false;
 };

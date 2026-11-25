@@ -93,8 +93,32 @@ QString MainWindow::summary() const {
     }
 }
 
+void MainWindow::closePage(const QString& host) {
+    MachinePage* page = open_.take(host);
+    if (!page)
+        return;
+    pages_->removeWidget(page);
+    page->deleteLater();
+}
+
 void MainWindow::refresh() {
     const QList<Machine>& machines = tailnet_->machines();
+
+    // Pages d'une session finie. L'ordinateur est revenu (nouvelle session, donc
+    // nouvelle adresse) : sa page est remplacée, l'ancienne ne joindrait plus
+    // rien. Il est parti : sa page reste tant qu'elle est à l'écran (ce que les
+    // terminaux affichent), puis disparaît.
+    const QString shownHost = list_->currentItem() ? list_->currentItem()->text() : QString();
+    for (const QString& host : open_.keys()) {
+        const auto it = std::ranges::find(machines, host, &Machine::host);
+        if (it != machines.cend() && it->ip != open_.value(host)->machine().ip) {
+            closePage(host);
+            if (host == shownHost)
+                select(host);
+        } else if (it == machines.cend() && open_.value(host)->gone() && host != shownHost) {
+            closePage(host);
+        }
+    }
 
     // Liste : les ordinateurs présents, et ceux dont la page est encore ouverte
     QStringList hosts;

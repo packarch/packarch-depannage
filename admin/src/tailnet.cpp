@@ -63,12 +63,13 @@ std::optional<QList<Machine>> machinesIn(const QByteArray& statusJson) {
 Arrivals::Change Arrivals::update(const QList<Machine>& machines, qint64 now) {
     Change change;
     for (const Machine& m : machines) {
-        if (!seen_.contains(m.host))
+        const auto known = seen_.constFind(m.host);
+        if (known == seen_.constEnd() || known->ip != m.ip)
             change.arrived.append(m);
-        seen_.insert(m.host, now);
+        seen_.insert(m.host, {now, m.ip});
     }
     for (auto it = seen_.begin(); it != seen_.end();) {
-        if (now - it.value() >= FORGET_SECS) {
+        if (now - it.value().time >= FORGET_SECS) {
             change.gone.append(it.key());
             it = seen_.erase(it);
         } else {

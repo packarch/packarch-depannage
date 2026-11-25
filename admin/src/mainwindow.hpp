@@ -32,6 +32,8 @@ private:
     void refresh();
     void select(const QString& host);
     void forget(const QString& host);
+    /// Ferme la page de HOST (terminaux et tchat compris)
+    void closePage(const QString& host);
     void notifyMessage(const QString& host, const QString& text);
     QString summary() const;
 

@@ -133,6 +133,7 @@ MachinePage::MachinePage(Machine machine, QWidget* parent)
 }
 
 void MachinePage::setGone() {
+    gone_ = true;
     chat_->setGone();
 }
 

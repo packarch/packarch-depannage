@@ -39,7 +39,10 @@ std::optional<QList<Machine>> machinesIn(const QByteArray& statusJson);
 class Arrivals {
 public:
     /// Absence au bout de laquelle un ordinateur est oublié : il sera annoncé de
-    /// nouveau à son retour (une coupure plus courte n'est pas une nouvelle session)
+    /// nouveau à son retour (une coupure plus courte n'est pas une nouvelle session).
+    /// Revenu plus tôt avec une autre adresse, c'est une nouvelle session (machine
+    /// éphémère : Tailscale lui donne une adresse neuve à chaque session) : il
+    /// est annoncé aussi.
     static constexpr qint64 FORGET_SECS = 120;
 
     struct Change {
@@ -49,7 +52,11 @@ public:
     Change update(const QList<Machine>& machines, qint64 now);
 
 private:
-    QHash<QString, qint64> seen_;
+    struct Seen {
+        qint64 time = 0;
+        QString ip;
+    };
+    QHash<QString, Seen> seen_;
 };
 
 /// Relit l'état de Tailscale toutes les trois secondes
