@@ -25,6 +25,10 @@ QString clean(const QString& text);
 /// Message d'une ligne ; rien si elle n'en contient pas
 std::optional<ChatMessage> parseLine(const QByteArray& line);
 
+/// TEXT avec les émoticônes tapées au clavier (« :) », « ;-) », « <3 »…) en vraies
+/// émoticônes ; seulement entre des blancs, pour ne pas toucher aux adresses et au code
+QString withEmoji(const QString& text);
+
 /// Ligne JSON de MESSAGE, saut de ligne compris
 QByteArray toLine(const ChatMessage& message);
 

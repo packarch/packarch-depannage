@@ -173,7 +173,7 @@ QString say() {
     const QString text = QString::fromUtf8(in.readAll());
     if (const QString e = ensure(); !e.isEmpty())
         return e;
-    if (const QString e = appendTo(CHAT, false, text); !e.isEmpty())
+    if (const QString e = appendTo(CHAT, false, chat::withEmoji(text)); !e.isEmpty())
         return e;
     if (!windowOpen())
         desktop::sessionRun({u"cd ~ && setsid -f packarch-depannage >/dev/null 2>&1"_s});

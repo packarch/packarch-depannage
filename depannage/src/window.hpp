@@ -12,7 +12,6 @@ class QLineEdit;
 class QPlainTextEdit;
 class QProcess;
 class QPushButton;
-class StatusIcon;
 
 class Window : public QWidget {
     Q_OBJECT
@@ -41,8 +40,10 @@ private:
     bool chatLive_ = false;
     /// L'état de la session est connu (le nom de la personne qui dépanne)
     bool statusKnown_ = false;
+    /// Ce que la fenêtre montre (session, lien, tchat) : elle est redimensionnée quand cela change
+    int shape_ = -1;
+    bool shapeApplied_ = false;
 
-    StatusIcon* icon_;
     QLabel* title_;
     QLabel* text_;
     QLabel* link_;

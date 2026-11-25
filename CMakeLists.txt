@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 3.21)
 # - packarch-admin : la personne qui dépanne (dossier admin) ;
 # - common : ce qu'ils partagent.
 # Une seule version pour les deux programmes : celle du tag du dépôt
-project(packarch-depannage VERSION 0.4.4 LANGUAGES CXX)
+project(packarch-depannage VERSION 0.4.5 LANGUAGES CXX)
 
 option(BUILD_DEPANNAGE "packarch-depannage (ordinateur dépanné)" ON)
 option(BUILD_ADMIN "packarch-admin (personne qui dépanne ; demande qtermwidget)" ON)
@@ -33,7 +33,8 @@ target_include_directories(common-core PUBLIC common)
 
 add_library(common STATIC
   common/singleinstance.cpp common/singleinstance.hpp
-  common/theme.cpp common/theme.hpp)
+  common/theme.cpp common/theme.hpp
+  common/emoji.cpp common/emoji.hpp)
 target_link_libraries(common PUBLIC common-core Qt6::Network Qt6::Widgets)
 
 if(BUILD_DEPANNAGE)
@@ -62,6 +63,8 @@ if(BUILD_DEPANNAGE)
     depannage/src/window.cpp depannage/src/window.hpp)
   target_compile_definitions(packarch-depannage-gui PRIVATE APP_VERSION="${PROJECT_VERSION}")
   target_link_libraries(packarch-depannage-gui PRIVATE depannage-core common Qt6::Widgets)
+  # Logo de Packarch (Packarch/branding/sources/packarch-logo.svg), dans la fenêtre et pour son icône
+  qt_add_resources(packarch-depannage-gui depannage-data PREFIX / BASE depannage/data FILES depannage/data/packarch-logo.png)
 
   add_executable(test_depannage depannage/tests/test_depannage.cpp)
   target_link_libraries(test_depannage PRIVATE depannage-core Qt6::Test)
@@ -71,6 +74,8 @@ if(BUILD_DEPANNAGE)
   install(TARGETS packarch-depannage RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT depannage)
   install(TARGETS packarch-depannage-gui RUNTIME DESTINATION ${GUI_DIR} COMPONENT depannage)
   install(FILES depannage/data/org.packarch.Depannage.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications COMPONENT depannage)
+  install(FILES depannage/data/packarch-logo.png DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps RENAME org.packarch.Depannage.png COMPONENT depannage)
+  install(FILES depannage/data/packarch-logo.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps RENAME org.packarch.Depannage.svg COMPONENT depannage)
   install(FILES depannage/data/org.packarch.depannage.policy DESTINATION ${CMAKE_INSTALL_DATADIR}/polkit-1/actions COMPONENT depannage)
   install(FILES depannage/data/packarch-depannage-cleanup.service DESTINATION lib/systemd/system COMPONENT depannage)
 endif()

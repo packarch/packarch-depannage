@@ -41,6 +41,7 @@ En root (pkexec, ou par la fenêtre) :
   cleanup                 arrête une session restée ouverte (démarrage de l'ordinateur)
   chat-say                envoie à l'utilisateur le message lu sur l'entrée standard
   chat-follow             affiche les messages du tchat au fil de l'eau (JSON)
+  helper-set              enregistre le nom de la personne qui dépanne, lu sur l'entrée standard
   key-set                 enregistre la clé de connexion lue sur l'entrée standard : les
                           sessions suivantes se connectent sans lien à envoyer
 )";
@@ -121,6 +122,8 @@ int main(int argc, char** argv) {
         error = session::stop();
     } else if (command == "cleanup"_L1) {
         error = session::stop(true);
+    } else if (command == "helper-set"_L1) {
+        error = session::setHelper();
     } else if (command == "key-set"_L1) {
         error = session::setKey();
     } else if (command == "connect"_L1) {

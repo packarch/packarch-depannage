@@ -17,6 +17,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <algorithm>
+
 using namespace Qt::StringLiterals;
 
 namespace session {
@@ -35,6 +37,8 @@ const QString BIN = u"/usr/bin/packarch-depannage"_s;
 /// à cet ordinateur, limitée au tag du dépannage, elle expire toute seule ;
 /// sans elle, ou si elle ne fonctionne plus : le lien de connexion.
 const QString KEY = u"/var/lib/packarch-depannage/authkey"_s;
+/// Nom donné par la personne qui dépanne (dossier de la session : effacé à sa fin)
+const QString HELPER = u"/run/packarch-depannage/helper"_s;
 /// Attente de la connexion avec la clé, avant de passer au lien
 const QString KEY_TIMEOUT = u"30s"_s;
 
@@ -380,6 +384,31 @@ Error setKey() {
     return {};
 }
 
+bool validHelperName(const QString& name) {
+    if (name.isEmpty() || name.size() > 32 || name != name.trimmed())
+        return false;
+    return std::ranges::all_of(name, [](QChar c) { return c.isLetterOrNumber() || u" -_."_s.contains(c); });
+}
+
+Error setHelper() {
+    if (const Error e = requireRoot(); !e.isEmpty())
+        return e;
+    if (!active())
+        return u"aucune session en cours"_s;
+    QFile in;
+    if (!in.open(stdin, QIODevice::ReadOnly))
+        return u"entrée standard illisible"_s;
+    const QString name = QString::fromUtf8(in.read(400)).trimmed();
+    if (!validHelperName(name))
+        return u"nom inattendu"_s;
+    QSaveFile f(HELPER);
+    if (!f.open(QIODevice::WriteOnly) || f.write(name.toUtf8()) < 0 || !f.commit())
+        return u"%1 : %2"_s.arg(HELPER, f.errorString());
+    // Lisible par la fenêtre de l'utilisateur
+    QFile::setPermissions(HELPER, QFile::ReadOwner | QFile::WriteOwner | QFile::ReadGroup | QFile::ReadOther);
+    return {};
+}
+
 Error connectRun() {
     if (const Error e = requireRoot(); !e.isEmpty())
         return e;
@@ -416,21 +445,9 @@ Description describe(const Status& st) {
                 "l'arrêtez."_s};
     }
     if (st.helping()) {
-        QString account;
-        if (st.helperName && st.helperLogin && *st.helperName != *st.helperLogin)
-            account = u"%1 (%2)"_s.arg(*st.helperName, *st.helperLogin);
-        else if (st.helperName)
-            account = *st.helperName;
-        else if (st.helperLogin)
-            account = *st.helperLogin;
-        const QString host = st.helper ? u"depuis « %1 »"_s.arg(*st.helper) : QString();
-        QString who;
-        if (!account.isEmpty() && !host.isEmpty())
-            who = u" : %1, %2"_s.arg(account, host);
-        else if (!account.isEmpty())
-            who = u" : %1"_s.arg(account);
-        else if (!host.isEmpty())
-            who = u" (%1)"_s.arg(host);
+        // Son nom seulement (celui qu'elle a donné, sinon celui de son compte Tailscale)
+        const QString name = st.helperName ? *st.helperName : st.helperLogin.value_or(QString());
+        const QString who = name.isEmpty() ? QString() : u" : %1"_s.arg(name);
         QString when = u"en ce moment"_s;
         if (st.lastActivity) {
             const qint64 minutes = qMax<qint64>(now() - *st.lastActivity, 0) / 60;
@@ -477,6 +494,12 @@ Status status() {
             if (!dns.isEmpty() && st.backend == "Running"_L1)
                 st.dnsName = dns;
         }
+    }
+    // Le nom sous lequel la personne qui dépanne s'est présentée, plutôt que celui de son compte Tailscale
+    if (QFile helper(HELPER); helper.open(QIODevice::ReadOnly)) {
+        const QString name = QString::fromUtf8(helper.read(400)).trimmed();
+        if (validHelperName(name))
+            st.helperName = name;
     }
     st.sshSessions = sshSessions();
     return st;

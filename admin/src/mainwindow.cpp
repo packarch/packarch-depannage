@@ -1,5 +1,6 @@
 #include "mainwindow.hpp"
 
+#include "chat.hpp"
 #include "chatmsg.hpp"
 #include "keys.hpp"
 #include "machinepage.hpp"
@@ -70,7 +71,9 @@ MainWindow::MainWindow(QWidget* parent)
     connect(tailnet_, &Tailnet::polled, this, &MainWindow::refresh);
     connect(tailnet_, &Tailnet::arrived, this, &MainWindow::announce);
     connect(tailnet_, &Tailnet::gone, this, &MainWindow::forget);
-    // À chaque dépannage, une clé de connexion neuve pour l'ordinateur
+    // À chaque dépannage : le nom sous lequel on se présente à la personne
+    connect(tailnet_, &Tailnet::arrived, this, [this](const Machine& m) { chat::announceHelper(m, this); });
+    // et une clé de connexion neuve pour l'ordinateur
     connect(tailnet_, &Tailnet::arrived, keys_, &KeyProvisioner::provision);
     connect(keys_, &KeyProvisioner::status, this, [this](const QString& host, const QString& text) {
         keyStatus_.insert(host, text);

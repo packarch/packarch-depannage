@@ -1,6 +1,7 @@
 #include "window.hpp"
 
 #include "chatfile.hpp"
+#include "emoji.hpp"
 
 #include <QApplication>
 #include <QClipboard>
@@ -12,11 +13,11 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
-#include <QPainter>
 #include <QPlainTextEdit>
 #include <QProcess>
 #include <QPushButton>
 #include <QTimer>
+#include <QToolButton>
 #include <QVBoxLayout>
 
 using namespace Qt::StringLiterals;
@@ -25,37 +26,18 @@ namespace {
 const QString MINUTES = u"60"_s;
 const QString TITLE = u"Packarch Dépannage"_s;
 const QString BIN = u"/usr/bin/packarch-depannage"_s;
+constexpr int TOAST_MS = 10000;
+/// Largeur de la fenêtre à l'ouverture
+constexpr int WIDTH = 440;
 
 /// Le programme en ligne de commande : à côté de celui-ci (mise au point), sinon celui du système
 QString commandLine() {
     const QString beside = QCoreApplication::applicationDirPath() + u"/packarch-depannage"_s;
     return QFile::exists(beside) ? beside : BIN;
 }
-constexpr int TOAST_MS = 10000;
 
 QString localTime(qint64 secs) {
     return QDateTime::fromSecsSinceEpoch(secs).toString(u"HH 'h' mm"_s);
-}
-
-/// Icônes dessinées, en lignes dans un carré de côté 1 : la fenêtre ne dépend
-/// pas du thème d'icônes
-using Icon = QList<QList<QPointF>>;
-const Icon MONITOR{{{0.0, 0.1}, {1.0, 0.1}, {1.0, 0.7}, {0.0, 0.7}, {0.0, 0.1}}, {{0.5, 0.7}, {0.5, 0.9}}, {{0.25, 0.9}, {0.75, 0.9}}};
-const Icon CHECK{{{0.1, 0.55}, {0.4, 0.85}, {0.9, 0.2}}};
-const Icon ARROWS{{{0.1, 0.35}, {0.9, 0.35}, {0.7, 0.15}}, {{0.9, 0.65}, {0.1, 0.65}, {0.3, 0.85}}};
-const Icon ENVELOPE{{{0.0, 0.2}, {1.0, 0.2}, {1.0, 0.8}, {0.0, 0.8}, {0.0, 0.2}}, {{0.0, 0.2}, {0.5, 0.55}, {1.0, 0.2}}};
-const Icon HOURGLASS{{{0.2, 0.05}, {0.8, 0.05}, {0.2, 0.95}, {0.8, 0.95}, {0.2, 0.05}}};
-
-/// Icône de l'état de la session
-const Icon* iconOf(session::Phase phase) {
-    switch (phase) {
-    case session::Phase::Idle: return &MONITOR;
-    case session::Phase::Helping: return &CHECK;
-    case session::Phase::Ready: return &ARROWS;
-    case session::Phase::Link: return &ENVELOPE;
-    case session::Phase::Preparing: return &HOURGLASS;
-    }
-    return &MONITOR;
 }
 
 /// Raison de l'échec : la dernière ligne d'erreur du programme, ou le code de
@@ -78,49 +60,30 @@ QString failureReason(int code, const QByteArray& stderrText) {
 }
 }  // namespace
 
-class StatusIcon : public QWidget {
-public:
-    using QWidget::QWidget;
-    void set(const Icon* icon, int size) {
-        icon_ = icon;
-        setFixedSize(size, size);
-        update();
-    }
-
-protected:
-    void paintEvent(QPaintEvent*) override {
-        if (!icon_)
-            return;
-        QPainter painter(this);
-        painter.setRenderHint(QPainter::Antialiasing);
-        const qreal margin = 3;
-        const qreal side = width() - 2 * margin;
-        QColor color = palette().color(QPalette::WindowText);
-        color.setAlphaF(0.75F);
-        painter.setPen(QPen(color, qMax(side / 14.0, 2.0), Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
-        for (const QList<QPointF>& line : *icon_) {
-            QPolygonF polygon;
-            for (const QPointF& p : line)
-                polygon << QPointF(margin + p.x() * side, margin + p.y() * side);
-            painter.drawPolyline(polygon);
-        }
-    }
-
-private:
-    const Icon* icon_ = nullptr;
-};
-
 Window::Window(QWidget* parent) : QWidget(parent) {
     setWindowTitle(u"%1 %2"_s.arg(TITLE, QStringLiteral(APP_VERSION)));
-    resize(560, 760);
-    setMinimumSize(440, 520);
+    const QPixmap logo(u":/packarch-logo.png"_s);
+    setWindowIcon(QIcon(logo));
 
-    icon_ = new StatusIcon(this);
+    // En-tête : le logo de Packarch, l'état de la session à côté
+    auto* logoLabel = new QLabel;
+    logoLabel->setPixmap(logo.scaled(52, 52, Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    logoLabel->setFixedSize(56, 56);
+    logoLabel->setAlignment(Qt::AlignCenter);
     title_ = new QLabel;
-    title_->setAlignment(Qt::AlignCenter);
+    title_->setTextFormat(Qt::RichText);
     text_ = new QLabel;
     text_->setWordWrap(true);
-    text_->setAlignment(Qt::AlignCenter);
+    text_->setTextFormat(Qt::PlainText);
+    auto* headText = new QVBoxLayout;
+    headText->setSpacing(2);
+    headText->addWidget(title_);
+    headText->addWidget(text_);
+    auto* head = new QHBoxLayout;
+    head->setSpacing(12);
+    head->addWidget(logoLabel, 0, Qt::AlignTop);
+    head->addLayout(headText, 1);
+
     link_ = new QLabel;
     link_->setWordWrap(true);
     link_->setAlignment(Qt::AlignCenter);
@@ -128,39 +91,45 @@ Window::Window(QWidget* parent) : QWidget(parent) {
     link_->setTextFormat(Qt::PlainText);
     QFont mono = link_->font();
     mono.setFamily(u"monospace"_s);
-    mono.setPointSizeF(mono.pointSizeF() * 1.15);
     link_->setFont(mono);
     copy_ = new QPushButton(u"Copier le lien"_s);
     details_ = new QLabel;
     details_->setAlignment(Qt::AlignCenter);
     details_->setEnabled(false);
+    QFont small = details_->font();
+    small.setPointSizeF(small.pointSizeF() * 0.9);
+    details_->setFont(small);
     allow_ = new QPushButton(u"Autoriser le dépannage (1 h)"_s);
     allow_->setDefault(true);
     extend_ = new QPushButton(u"+1 h"_s);
     stop_ = new QPushButton(u"Arrêter maintenant"_s);
-    stop_->setStyleSheet(u"QPushButton { background: #c01c28; color: white; padding: 8px 16px; border-radius: 6px; }"
+    stop_->setStyleSheet(u"QPushButton { background: #c01c28; color: white; padding: 6px 14px; border-radius: 6px; }"
                          "QPushButton:disabled { background: #6b3a3e; }"_s);
     for (QPushButton* b : {copy_, allow_, extend_, stop_})
-        b->setMinimumHeight(38);
+        b->setMinimumHeight(34);
 
     auto* buttons = new QHBoxLayout;
     buttons->addStretch();
+    buttons->addWidget(copy_);
+    buttons->addWidget(allow_);
     buttons->addWidget(extend_);
     buttons->addWidget(stop_);
     buttons->addStretch();
 
-    // Tchat, une fois l'ordinateur connecté
+    // Tchat, une fois l'ordinateur connecté : la fenêtre s'agrandit alors
     chat_ = new QWidget;
     auto* chatLayout = new QVBoxLayout(chat_);
-    chatLayout->setContentsMargins(0, 8, 0, 0);
+    chatLayout->setContentsMargins(0, 4, 0, 0);
     log_ = new QPlainTextEdit;
     log_->setReadOnly(true);
+    log_->setMinimumHeight(120);
     input_ = new QLineEdit;
     input_->setPlaceholderText(u"Écrire à la personne qui vous dépanne…"_s);
     input_->setMaxLength(chat::MAX_CHARS);
     send_ = new QPushButton(u"Envoyer"_s);
     auto* inputRow = new QHBoxLayout;
     inputRow->addWidget(input_);
+    inputRow->addWidget(emoji::button(input_));
     inputRow->addWidget(send_);
     chatLayout->addWidget(log_, 1);
     chatLayout->addLayout(inputRow);
@@ -168,23 +137,17 @@ Window::Window(QWidget* parent) : QWidget(parent) {
     toast_ = new QLabel;
     toast_->setWordWrap(true);
     toast_->setAlignment(Qt::AlignCenter);
-    toast_->setStyleSheet(u"background: #464646; color: white; padding: 6px; border-radius: 4px;"_s);
+    toast_->setStyleSheet(u"background: #464646; color: white; padding: 5px; border-radius: 4px;"_s);
     toast_->hide();
 
     auto* layout = new QVBoxLayout(this);
-    layout->setContentsMargins(18, 14, 18, 14);
+    layout->setContentsMargins(14, 12, 14, 12);
     layout->setSpacing(8);
-    layout->addStretch(1);
-    layout->addWidget(icon_, 0, Qt::AlignHCenter);
-    layout->addWidget(title_);
-    layout->addWidget(text_);
+    layout->addLayout(head);
     layout->addWidget(link_);
-    layout->addWidget(copy_, 0, Qt::AlignHCenter);
     layout->addWidget(details_);
-    layout->addWidget(allow_, 0, Qt::AlignHCenter);
     layout->addLayout(buttons);
-    layout->addWidget(chat_, 8);
-    layout->addStretch(1);
+    layout->addWidget(chat_, 1);
     layout->addWidget(toast_);
 
     connect(allow_, &QPushButton::clicked, this,
@@ -202,6 +165,7 @@ Window::Window(QWidget* parent) : QWidget(parent) {
     connect(send_, &QPushButton::clicked, this, &Window::sendInput);
     connect(input_, &QLineEdit::returnPressed, this, &Window::sendInput);
 
+    setMinimumWidth(380);
     status_.hostname = session::hostname();
     apply(status_);
     auto* statusTimer = new QTimer(this);
@@ -248,9 +212,7 @@ void Window::pollStatus() {
 void Window::apply(const session::Status& st) {
     status_ = st;
     const session::Description d = session::describe(st);
-    icon_->set(iconOf(d.phase), st.active ? 44 : 76);
-    title_->setText(u"<span style='font-size:%1pt; font-weight:600'>%2</span>"_s.arg(st.active ? 15 : 19).arg(d.title.toHtmlEscaped()));
-    text_->setTextFormat(Qt::PlainText);
+    title_->setText(u"<span style='font-size:13pt; font-weight:600'>%1</span>"_s.arg(d.title.toHtmlEscaped()));
     text_->setText(d.text);
 
     const bool waitingLink = st.active && st.authUrl && st.backend != "Running"_L1;
@@ -261,10 +223,10 @@ void Window::apply(const session::Status& st) {
 
     details_->setVisible(st.active);
     if (st.active) {
-        QString details = u"Nom de l'ordinateur : %1"_s.arg(st.dnsName.value_or(st.hostname));
+        QString details = st.dnsName.value_or(st.hostname);
         if (st.end) {
             const qint64 left = (qMax<qint64>(*st.end - session::now(), 0) + 59) / 60;
-            details += u"\nFin automatique à %1 (dans %2 min)."_s.arg(localTime(*st.end)).arg(left);
+            details += u" · fin à %1 (dans %2 min)"_s.arg(localTime(*st.end)).arg(left);
         }
         details_->setText(details);
     }
@@ -274,7 +236,24 @@ void Window::apply(const session::Status& st) {
     extend_->setEnabled(!busy_);
     stop_->setVisible(st.active);
     stop_->setEnabled(!busy_);
-    chat_->setVisible(st.active && st.backend == "Running"_L1);
+    const bool chat = st.active && st.backend == "Running"_L1;
+    chat_->setVisible(chat);
+
+    // La fenêtre prend la place de ce qu'elle montre : petite à l'ouverture, plus
+    // haute avec le lien, puis avec le tchat. Seulement quand ce qu'elle montre
+    // change : une taille choisie par l'utilisateur est gardée entre-temps.
+    const int shape = (st.active ? 1 : 0) | (waitingLink ? 2 : 0) | (chat ? 4 : 0);
+    if (shape != shape_) {
+        shape_ = shape;
+        QTimer::singleShot(0, this, [this] {
+            // La largeur choisie par l'utilisateur est gardée, la hauteur suit le contenu
+            const int w = shapeApplied_ ? width() : WIDTH;
+            layout()->activate();
+            const int h = layout()->hasHeightForWidth() ? layout()->totalHeightForWidth(w) : layout()->totalSizeHint().height();
+            resize(w, h);
+            shapeApplied_ = true;
+        });
+    }
 }
 
 void Window::pollChat() {
@@ -300,7 +279,7 @@ void Window::pollChat() {
 }
 
 void Window::sendInput() {
-    const QString text = chat::clean(input_->text());
+    const QString text = chat::withEmoji(chat::clean(input_->text()));
     if (text.isEmpty())
         return;
     const QString error = chatfile::appendTo(chatfile::CHAT, true, text);

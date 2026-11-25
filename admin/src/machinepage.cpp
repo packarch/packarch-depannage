@@ -2,6 +2,7 @@
 
 #include "terminal.hpp"
 
+#include "emoji.hpp"
 #include "info.hpp"
 #include "screenview.hpp"
 
@@ -19,6 +20,7 @@
 #include <QSplitter>
 #include <QTabBar>
 #include <QTabWidget>
+#include <QToolButton>
 #include <QTimer>
 #include <QTreeWidget>
 #include <QVBoxLayout>
@@ -123,6 +125,7 @@ MachinePage::MachinePage(Machine machine, QWidget* parent)
     send_ = new QPushButton(u"Envoyer"_s);
     auto* inputRow = new QHBoxLayout;
     inputRow->addWidget(input_);
+    inputRow->addWidget(emoji::button(input_));
     inputRow->addWidget(send_);
     chatLayout->addWidget(chatTitle);
     chatLayout->addWidget(banner_);
@@ -283,7 +286,7 @@ void MachinePage::append(const ChatMessage& m) {
 }
 
 void MachinePage::sendInput() {
-    const QString text = chat::clean(input_->text());
+    const QString text = chat::withEmoji(chat::clean(input_->text()));
     if (text.isEmpty() || !send_->isEnabled())
         return;
     input_->clear();

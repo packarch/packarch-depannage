@@ -3,6 +3,9 @@
 #include <QProcess>
 #include <QTimer>
 
+#include <pwd.h>
+#include <unistd.h>
+
 using namespace Qt::StringLiterals;
 
 namespace {
@@ -31,6 +34,35 @@ QProcess* ssh(const Machine& machine, const QString& command, QObject* parent) {
 }  // namespace
 
 namespace chat {
+
+QString helperName() {
+    QString name = qEnvironmentVariable("USER");
+    if (name.isEmpty()) {
+        if (const passwd* user = ::getpwuid(::getuid()))
+            name = QString::fromLocal8Bit(user->pw_name);
+    }
+    return name;
+}
+
+void announceHelper(const Machine& machine, QObject* parent) {
+    const QString name = helperName();
+    if (name.isEmpty() || !tailnet::validIp(machine.ip))
+        return;
+    // Le nom passe par l'entrée standard, pas par le shell distant
+    QProcess* say = ssh(machine, u"helper-set"_s, parent);
+    say->setStandardOutputFile(QProcess::nullDevice());
+    say->setStandardErrorFile(QProcess::nullDevice());
+    QObject::connect(say, &QProcess::started, say, [say, name] {
+        say->write(name.toUtf8());
+        say->closeWriteChannel();
+    });
+    QObject::connect(say, &QProcess::finished, say, &QObject::deleteLater);
+    QObject::connect(say, &QProcess::errorOccurred, say, [say](QProcess::ProcessError error) {
+        if (error == QProcess::FailedToStart)
+            say->deleteLater();
+    });
+    say->start();
+}
 
 QStringList sshOptions(bool batch) {
     QStringList options{u"StrictHostKeyChecking=no"_s, u"UserKnownHostsFile=/dev/null"_s, u"LogLevel=ERROR"_s,

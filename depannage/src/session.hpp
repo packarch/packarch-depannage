@@ -94,6 +94,12 @@ Error setKey();
 /// rejoint le réseau avec la clé de connexion si elle existe et fonctionne,
 /// sinon par le lien de connexion (attend qu'il soit validé)
 Error connectRun();
+/// packarch-depannage helper-set (root, par Tailscale SSH) : le nom sous lequel
+/// la personne qui dépanne se présente (lu sur l'entrée standard), affiché à la
+/// place de celui de son compte Tailscale, jusqu'à la fin de la session
+Error setHelper();
+/// Nom présentable : court, des lettres, des chiffres, espaces et « -_. »
+bool validHelperName(const QString& name);
 /// KEY a la forme d'une clé d'autorisation Tailscale (elle est passée à tailscale)
 bool validKey(const QString& key);
 

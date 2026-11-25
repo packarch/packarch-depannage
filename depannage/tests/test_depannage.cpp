@@ -45,6 +45,31 @@ private slots:
         QCOMPARE(session::machineName(u"éé"_s), u"packarch-ordinateur"_s);
     }
 
+    void helperNamesAndEmoji() {
+        QVERIFY(session::validHelperName(u"antidote"_s));
+        QVERIFY(session::validHelperName(u"Fabrice C."_s));
+        QVERIFY(session::validHelperName(u"Éloïse"_s));
+        QVERIFY(!session::validHelperName(u""_s));
+        QVERIFY(!session::validHelperName(u" antidote"_s));
+        QVERIFY(!session::validHelperName(u"root\n<b>"_s));
+        QVERIFY(!session::validHelperName(u"support (officiel)"_s));
+        QVERIFY(!session::validHelperName(QString(33, u'a')));
+        session::Status st;
+        st.active = true;
+        st.sshSessions = 1;
+        st.helperName = u"antidote"_s;
+        st.helperLogin = u"quelquun@example.com"_s;
+        st.helper = u"packarch"_s;
+        const QString text = session::describe(st).text;
+        QVERIFY2(text.contains(u"cet ordinateur : antidote. "_s), qPrintable(text));
+        QVERIFY(!text.contains(u"example.com"_s) && !text.contains(u"packarch"_s));
+        // Émoticônes tapées : entre des blancs seulement
+        QCOMPARE(chat::withEmoji(u"Merci :) ça marche <3"_s), u"Merci 🙂 ça marche ❤️"_s);
+        QCOMPARE(chat::withEmoji(u"voir http://x:8080/a:)b et C:D"_s), u"voir http://x:8080/a:)b et C:D"_s);
+        QCOMPARE(chat::withEmoji(u"ligne 1 ;)\n:("_s), u"ligne 1 😉\n😕"_s);
+        QCOMPARE(chat::clean(u"ok 👍 ❤️"_s), u"ok 👍 ❤️"_s);
+    }
+
     void connectionKeys() {
         QVERIFY(session::validKey(u"tskey-auth-kAbc123CNTRL-xYz789"_s));
         QVERIFY(!session::validKey(u""_s));

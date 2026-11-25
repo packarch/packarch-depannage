@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Logo de Packarch : pacman jaune (même forme que le fond de packarch) -->
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="jaune" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd95a"/>
+      <stop offset="1" stop-color="#f0b429"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#jaune)" d="M50 50 L86.86 24.19 A45 45 0 1 0 86.86 75.81 Z"/>
+</svg>

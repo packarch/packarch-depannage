@@ -2,6 +2,9 @@
 
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QList>
+#include <QPair>
+#include <QStringList>
 
 using namespace Qt::StringLiterals;
 
@@ -36,6 +39,29 @@ std::optional<ChatMessage> parseLine(const QByteArray& line) {
     if (m.text.isEmpty())
         return std::nullopt;
     return m;
+}
+
+QString withEmoji(const QString& text) {
+    static const QList<QPair<QString, QString>> table{
+        {u":-)"_s, u"🙂"_s}, {u":)"_s, u"🙂"_s},  {u":-D"_s, u"😀"_s}, {u":D"_s, u"😀"_s},
+        {u";-)"_s, u"😉"_s}, {u";)"_s, u"😉"_s},  {u":-("_s, u"😕"_s}, {u":("_s, u"😕"_s},
+        {u":'("_s, u"😢"_s}, {u":-P"_s, u"😛"_s}, {u":P"_s, u"😛"_s},  {u":-O"_s, u"😮"_s},
+        {u":O"_s, u"😮"_s},  {u"<3"_s, u"❤️"_s},  {u"xD"_s, u"😂"_s},  {u"XD"_s, u"😂"_s},
+    };
+    QStringList lines = text.split(u'\n');
+    for (QString& line : lines) {
+        QStringList words = line.split(u' ');
+        for (QString& word : words) {
+            for (const auto& [typed, shown] : table) {
+                if (word == typed) {
+                    word = shown;
+                    break;
+                }
+            }
+        }
+        line = words.join(u' ');
+    }
+    return lines.join(u'\n');
 }
 
 QByteArray toLine(const ChatMessage& message) {

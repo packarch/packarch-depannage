@@ -166,7 +166,7 @@ int run() {
                     show(session::status());
             } else if (line->startsWith(u'/')) {
                 help();
-            } else if (const QString error = chatfile::appendTo(chatfile::CHAT, true, *line); !error.isEmpty()) {
+            } else if (const QString error = chatfile::appendTo(chatfile::CHAT, true, chat::withEmoji(*line)); !error.isEmpty()) {
                 say(u"Message non envoyé (%1) : le tchat fonctionne une fois l'ordinateur connecté."_s.arg(error));
             }
         }

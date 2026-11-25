@@ -13,6 +13,14 @@ class QProcess;
 
 namespace chat {
 
+/// Nom sous lequel la personne qui dépanne se présente : son nom de session sur
+/// cet ordinateur (affiché chez la personne dépannée à la place du nom de son
+/// compte Tailscale)
+QString helperName();
+/// Donne ce nom à MACHINE (packarch-depannage helper-set ; sans effet sur une
+/// version qui ne connaît pas la commande)
+void announceHelper(const Machine& machine, QObject* parent);
+
 /// Options de ssh vers un ordinateur dépanné. Pas de vérification de la clé
 /// d'hôte : elle change à chaque session (état en mémoire), et le réseau
 /// Tailscale authentifie déjà la machine jointe par son adresse.
