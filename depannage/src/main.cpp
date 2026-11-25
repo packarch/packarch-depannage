@@ -12,20 +12,24 @@
 #include "chatfile.hpp"
 #include "desktop.hpp"
 #include "session.hpp"
-#include "singleinstance.hpp"
-#include "theme.hpp"
-#include "window.hpp"
+#include "text.hpp"
 
-#include <QApplication>
+#include <QCoreApplication>
+#include <QFile>
+#include <QProcess>
 #include <QJsonDocument>
 #include <QTextStream>
+
+#include <unistd.h>
 
 using namespace Qt::StringLiterals;
 
 namespace {
 const char USAGE[] = R"(Usage : packarch-depannage [COMMANDE]
 
-  (sans commande)         fenêtre du dépannage à distance
+  (sans commande)         fenêtre du dépannage à distance ; sans bureau (console), ou si
+                          la fenêtre ne s'ouvre pas : mode texte
+  texte                   mode texte : autoriser le dépannage, lien, tchat, arrêt
   status                  état de la session (JSON)
   info                    description de l'ordinateur (pour la personne qui dépanne)
   session-run COMMANDE…   lance COMMANDE dans le bureau de l'utilisateur connecté (root)
@@ -52,35 +56,52 @@ qint64 minutes(const QStringList& args, QString& error) {
     return m;
 }
 
-int window(int argc, char** argv) {
-    QApplication app(argc, argv);
-    QApplication::setApplicationName(u"packarch-depannage"_s);
-    QApplication::setApplicationVersion(QStringLiteral(APP_VERSION));
-    QApplication::setDesktopFileName(u"org.packarch.Depannage"_s);
-    theme::apply();
-    // Déjà ouverte (depuis le menu, le plus souvent) : elle est ramenée devant
-    SingleInstance instance(u"packarch-depannage"_s);
-    if (instance.alreadyRunning(true))
-        return 0;
-    Window w;
-    QObject::connect(&instance, &SingleInstance::showRequested, &w, &Window::present);
-    w.show();
-    return QApplication::exec();
+/// La fenêtre : un programme à part (à côté de celui-ci pendant la mise au point)
+QString guiProgram() {
+    const QString beside = QCoreApplication::applicationDirPath() + u"/packarch-depannage-gui"_s;
+    return QFile::exists(beside) ? beside : QStringLiteral(GUI_PATH);
+}
+
+/// Sans commande : la fenêtre, ou le mode texte s'il n'y a pas de bureau (console)
+/// ou si la fenêtre n'a pas pu s'ouvrir alors que ce programme est dans un terminal
+int windowOrText() {
+    const bool desktop = qEnvironmentVariableIsSet("WAYLAND_DISPLAY") || qEnvironmentVariableIsSet("DISPLAY");
+    const bool terminal = ::isatty(STDIN_FILENO) && ::isatty(STDOUT_FILENO);
+    if (desktop) {
+        QProcess gui;
+        gui.setInputChannelMode(QProcess::ForwardedInputChannel);
+        gui.setProcessChannelMode(QProcess::ForwardedChannels);
+        gui.start(guiProgram(), QStringList());
+        if (gui.waitForStarted(-1)) {
+            gui.waitForFinished(-1);
+            if (gui.exitStatus() == QProcess::NormalExit && gui.exitCode() == 0)
+                return 0;
+        }
+        if (!terminal)
+            return 1;
+        QTextStream(stderr) << u"La fenêtre n'a pas pu s'ouvrir : dépannage en mode texte.\n\n"_s;
+    } else if (!terminal) {
+        QTextStream(stderr) << u"packarch-depannage : ni bureau ni terminal\n"_s;
+        return 1;
+    }
+    return text::run();
 }
 }  // namespace
 
 int main(int argc, char** argv) {
-    if (argc < 2)
-        return window(argc, argv);
-
-    // Commandes : sans fenêtre ni écran (root, connexion SSH, systemd)
+    // Sans fenêtre ni écran (root, connexion SSH, systemd, console) : Qt Core seulement
     QCoreApplication app(argc, argv);
+    QCoreApplication::setApplicationVersion(QStringLiteral(APP_VERSION));
+    if (argc < 2)
+        return windowOrText();
     const QStringList args = QCoreApplication::arguments().mid(1);
     const QString command = args.first();
     QTextStream out(stdout);
     QTextStream err(stderr);
     QString error;
-    if (command == "status"_L1) {
+    if (command == "text"_L1 || command == "texte"_L1) {
+        return text::run();
+    } else if (command == "status"_L1) {
         out << QJsonDocument(session::status().toJson()).toJson(QJsonDocument::Indented);
     } else if (command == "info"_L1) {
         desktop::info();

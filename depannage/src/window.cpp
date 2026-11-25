@@ -25,6 +25,12 @@ namespace {
 const QString MINUTES = u"60"_s;
 const QString TITLE = u"Packarch Dépannage"_s;
 const QString BIN = u"/usr/bin/packarch-depannage"_s;
+
+/// Le programme en ligne de commande : à côté de celui-ci (mise au point), sinon celui du système
+QString commandLine() {
+    const QString beside = QCoreApplication::applicationDirPath() + u"/packarch-depannage"_s;
+    return QFile::exists(beside) ? beside : BIN;
+}
 constexpr int TOAST_MS = 10000;
 
 QString localTime(qint64 secs) {
@@ -40,54 +46,16 @@ const Icon ARROWS{{{0.1, 0.35}, {0.9, 0.35}, {0.7, 0.15}}, {{0.9, 0.65}, {0.1, 0
 const Icon ENVELOPE{{{0.0, 0.2}, {1.0, 0.2}, {1.0, 0.8}, {0.0, 0.8}, {0.0, 0.2}}, {{0.0, 0.2}, {0.5, 0.55}, {1.0, 0.2}}};
 const Icon HOURGLASS{{{0.2, 0.05}, {0.8, 0.05}, {0.2, 0.95}, {0.8, 0.95}, {0.2, 0.05}}};
 
-struct Description {
-    const Icon* icon;
-    QString title;
-    QString text;
-};
-
-/// Icône, titre et texte de l'état de la session
-Description describe(const session::Status& st) {
-    if (!st.active) {
-        return {&MONITOR, TITLE,
-                u"Autorise une personne de confiance à se connecter à cet ordinateur pour le réparer. Elle aura un "
-                "accès complet, pendant une heure seulement : l'accès se coupe tout seul à la fin, ou dès que vous "
-                "cliquez sur « Arrêter »."_s};
+/// Icône de l'état de la session
+const Icon* iconOf(session::Phase phase) {
+    switch (phase) {
+    case session::Phase::Idle: return &MONITOR;
+    case session::Phase::Helping: return &CHECK;
+    case session::Phase::Ready: return &ARROWS;
+    case session::Phase::Link: return &ENVELOPE;
+    case session::Phase::Preparing: return &HOURGLASS;
     }
-    if (st.helping()) {
-        QString account;
-        if (st.helperName && st.helperLogin && *st.helperName != *st.helperLogin)
-            account = u"%1 (%2)"_s.arg(*st.helperName, *st.helperLogin);
-        else if (st.helperName)
-            account = *st.helperName;
-        else if (st.helperLogin)
-            account = *st.helperLogin;
-        const QString host = st.helper ? u"depuis « %1 »"_s.arg(*st.helper) : QString();
-        QString who;
-        if (!account.isEmpty() && !host.isEmpty())
-            who = u" : %1, %2"_s.arg(account, host);
-        else if (!account.isEmpty())
-            who = u" : %1"_s.arg(account);
-        else if (!host.isEmpty())
-            who = u" (%1)"_s.arg(host);
-        QString when = u"en ce moment"_s;
-        if (st.lastActivity) {
-            const qint64 minutes = qMax<qint64>(session::now() - *st.lastActivity, 0) / 60;
-            if (minutes == 1)
-                when = u"il y a 1 min"_s;
-            else if (minutes > 1)
-                when = u"il y a %1 min"_s.arg(minutes);
-        }
-        return {&CHECK, u"Dépannage en cours"_s,
-                u"La personne qui vous dépanne travaille sur cet ordinateur%1. Dernière activité : %2."_s.arg(who, when)};
-    }
-    if (st.backend == "Running"_L1)
-        return {&ARROWS, u"Prêt pour le dépannage"_s,
-                u"L'ordinateur est joignable. La personne qui vous dépanne peut se connecter."_s};
-    if (st.authUrl)
-        return {&ENVELOPE, u"Envoyez ce lien"_s,
-                u"Envoyez ce lien à la personne qui vous dépanne (SMS, e-mail…). Elle doit l'ouvrir pour se connecter."_s};
-    return {&HOURGLASS, u"Préparation…"_s, u"Démarrage de la connexion sécurisée."_s};
+    return &MONITOR;
 }
 
 /// Raison de l'échec : la dernière ligne d'erreur du programme, ou le code de
@@ -274,14 +242,13 @@ void Window::pollStatus() {
         if (error == QProcess::FailedToStart)
             done();
     });
-    // Ce programme lui-même : le même, en cours de mise au point comme installé
-    statusProcess_->start(QCoreApplication::applicationFilePath(), {u"status"_s});
+    statusProcess_->start(commandLine(), {u"status"_s});
 }
 
 void Window::apply(const session::Status& st) {
     status_ = st;
-    const Description d = describe(st);
-    icon_->set(d.icon, st.active ? 44 : 76);
+    const session::Description d = session::describe(st);
+    icon_->set(iconOf(d.phase), st.active ? 44 : 76);
     title_->setText(u"<span style='font-size:%1pt; font-weight:600'>%2</span>"_s.arg(st.active ? 15 : 19).arg(d.title.toHtmlEscaped()));
     text_->setTextFormat(Qt::PlainText);
     text_->setText(d.text);

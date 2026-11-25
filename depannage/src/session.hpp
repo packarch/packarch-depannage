@@ -54,6 +54,16 @@ struct Status {
 /// courtes, la fenêtre ne les verrait presque jamais ouvertes
 inline constexpr qint64 ACTIVITY_SECS = 300;
 
+/// Où en est la session, pour la personne dépannée
+enum class Phase { Idle, Preparing, Link, Ready, Helping };
+struct Description {
+    Phase phase;
+    QString title;
+    QString text;
+};
+/// Titre et texte de l'état de la session (fenêtre et mode texte)
+Description describe(const Status& status);
+
 /// Chaque fonction rend une erreur à afficher, vide si tout va bien
 using Error = QString;
 

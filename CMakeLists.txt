@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 3.21)
 # - packarch-admin : la personne qui dépanne (dossier admin) ;
 # - common : ce qu'ils partagent.
 # Une seule version pour les deux programmes : celle du tag du dépôt
-project(packarch-depannage VERSION 0.4.0 LANGUAGES CXX)
+project(packarch-depannage VERSION 0.4.1 LANGUAGES CXX)
 
 option(BUILD_DEPANNAGE "packarch-depannage (ordinateur dépanné)" ON)
 option(BUILD_ADMIN "packarch-admin (personne qui dépanne ; demande qtermwidget)" ON)
@@ -23,13 +23,18 @@ add_compile_options(-Wall -Wextra -Wpedantic)
 add_compile_definitions(QT_NO_CAST_FROM_ASCII QT_NO_CAST_TO_ASCII)
 enable_testing()
 
-add_library(common STATIC
+# Sans fenêtre (Qt Core seulement) : les commandes de packarch-depannage, lancées
+# en root, par ssh ou dans une console, ne dépendent pas de la partie graphique de Qt
+add_library(common-core STATIC
   common/chatmsg.cpp common/chatmsg.hpp
-  common/tailscale.cpp common/tailscale.hpp
+  common/tailscale.cpp common/tailscale.hpp)
+target_link_libraries(common-core PUBLIC Qt6::Core)
+target_include_directories(common-core PUBLIC common)
+
+add_library(common STATIC
   common/singleinstance.cpp common/singleinstance.hpp
   common/theme.cpp common/theme.hpp)
-target_link_libraries(common PUBLIC Qt6::Core Qt6::Network Qt6::Widgets)
-target_include_directories(common PUBLIC common)
+target_link_libraries(common PUBLIC common-core Qt6::Network Qt6::Widgets)
 
 if(BUILD_DEPANNAGE)
   # Sans fenêtre : la session, le tchat, le bureau de l'utilisateur (root, tests)
@@ -37,14 +42,26 @@ if(BUILD_DEPANNAGE)
     depannage/src/session.cpp depannage/src/session.hpp
     depannage/src/chatfile.cpp depannage/src/chatfile.hpp
     depannage/src/desktop.cpp depannage/src/desktop.hpp)
-  target_link_libraries(depannage-core PUBLIC common)
+  target_link_libraries(depannage-core PUBLIC common-core)
   target_include_directories(depannage-core PUBLIC depannage/src)
 
+  # packarch-depannage : les commandes et le mode texte, sans la partie graphique
+  # de Qt. La fenêtre est un programme à part, qu'il lance : un problème
+  # d'affichage (bureau qui ne démarre pas, Qt graphique cassé) laisse le
+  # dépannage possible dans une console.
+  set(GUI_DIR ${CMAKE_INSTALL_FULL_LIBDIR}/packarch-depannage)
   add_executable(packarch-depannage
     depannage/src/main.cpp
+    depannage/src/text.cpp depannage/src/text.hpp)
+  target_compile_definitions(packarch-depannage PRIVATE
+    APP_VERSION="${PROJECT_VERSION}" GUI_PATH="${GUI_DIR}/packarch-depannage-gui")
+  target_link_libraries(packarch-depannage PRIVATE depannage-core)
+
+  add_executable(packarch-depannage-gui
+    depannage/src/gui_main.cpp
     depannage/src/window.cpp depannage/src/window.hpp)
-  target_compile_definitions(packarch-depannage PRIVATE APP_VERSION="${PROJECT_VERSION}")
-  target_link_libraries(packarch-depannage PRIVATE depannage-core Qt6::Widgets)
+  target_compile_definitions(packarch-depannage-gui PRIVATE APP_VERSION="${PROJECT_VERSION}")
+  target_link_libraries(packarch-depannage-gui PRIVATE depannage-core common Qt6::Widgets)
 
   add_executable(test_depannage depannage/tests/test_depannage.cpp)
   target_link_libraries(test_depannage PRIVATE depannage-core Qt6::Test)
@@ -52,6 +69,7 @@ if(BUILD_DEPANNAGE)
 
   # Composants d'installation : un paquet par programme (cmake --install build --component depannage)
   install(TARGETS packarch-depannage RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} COMPONENT depannage)
+  install(TARGETS packarch-depannage-gui RUNTIME DESTINATION ${GUI_DIR} COMPONENT depannage)
   install(FILES depannage/data/org.packarch.Depannage.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications COMPONENT depannage)
   install(FILES depannage/data/org.packarch.depannage.policy DESTINATION ${CMAKE_INSTALL_DATADIR}/polkit-1/actions COMPONENT depannage)
   install(FILES depannage/data/packarch-depannage-cleanup.service DESTINATION lib/systemd/system COMPONENT depannage)

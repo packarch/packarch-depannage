@@ -37,6 +37,24 @@ programme.
 5. Au bout d'une heure (« +1 h » pour prolonger), ou avec « Arrêter maintenant », la session
    s'arrête : `tailscale logout` (l'ordinateur quitte le réseau), puis arrêt de `tailscaled`.
 
+## Sans bureau : mode texte
+
+Si le bureau de la personne ne démarre pas, ou si la fenêtre ne s'ouvre pas, le dépannage se
+lance dans une console (Ctrl+Alt+F3, puis son nom et son mot de passe) :
+
+```
+packarch-depannage
+```
+
+Sans bureau, la commande passe toute seule en mode texte (`packarch-depannage texte` le
+force) : « Autoriser le dépannage pendant 1 heure ? », le mot de passe, puis le lien à
+transmettre s'il en faut un, l'état, et le tchat (une ligne tapée est un message). `/plus`
+prolonge, `/arreter` arrête, `/quitter` quitte en laissant la session ouverte.
+
+Les commandes et le mode texte n'utilisent que Qt Core : la fenêtre est un programme à part
+(`/usr/lib/packarch-depannage/packarch-depannage-gui`, lancé par `packarch-depannage`). Un Qt
+graphique cassé, un pilote ou un compositeur en panne ne les empêchent pas de fonctionner.
+
 ## Tchat
 
 Dès que l'ordinateur est connecté, sa fenêtre affiche un tchat. La personne qui dépanne ouvre
@@ -152,7 +170,8 @@ qu'aucune n'a `*` ou `tag:depannage` pour source).
 ## Ligne de commande
 
 ```
-packarch-depannage                       fenêtre
+packarch-depannage                       fenêtre (mode texte dans une console)
+packarch-depannage texte                 mode texte
 packarch-depannage status                état de la session (JSON)
 packarch-depannage info                  description de l'ordinateur (utilisateur, bureau, thème…)
 packarch-depannage session-run 'CMD'     CMD dans le bureau de l'utilisateur connecté (root)
@@ -218,7 +237,8 @@ ne doit rien afficher.
 
 Deux paquets, dans [myrepo-pkgs](https://github.com/packarch/myrepo-pkgs).
 
-**packarch-depannage** : le binaire dans `/usr/bin`, `org.packarch.Depannage.desktop`,
+**packarch-depannage** : le binaire dans `/usr/bin`, la fenêtre dans
+`/usr/lib/packarch-depannage`, `org.packarch.Depannage.desktop`,
 `org.packarch.depannage.policy` (polkit) et `packarch-depannage-cleanup.service` (à activer).
 Dépendances : `qt6-base`, `tailscale`, `polkit`, `libnotify`, `util-linux` (runuser).
 

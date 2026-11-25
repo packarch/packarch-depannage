@@ -408,6 +408,49 @@ Error connectRun() {
     return {};
 }
 
+Description describe(const Status& st) {
+    if (!st.active) {
+        return {Phase::Idle, u"Packarch Dépannage"_s,
+                u"Autorise une personne de confiance à se connecter à cet ordinateur pour le réparer. Elle aura un "
+                "accès complet, pendant une heure seulement : l'accès se coupe tout seul à la fin, ou dès que vous "
+                "l'arrêtez."_s};
+    }
+    if (st.helping()) {
+        QString account;
+        if (st.helperName && st.helperLogin && *st.helperName != *st.helperLogin)
+            account = u"%1 (%2)"_s.arg(*st.helperName, *st.helperLogin);
+        else if (st.helperName)
+            account = *st.helperName;
+        else if (st.helperLogin)
+            account = *st.helperLogin;
+        const QString host = st.helper ? u"depuis « %1 »"_s.arg(*st.helper) : QString();
+        QString who;
+        if (!account.isEmpty() && !host.isEmpty())
+            who = u" : %1, %2"_s.arg(account, host);
+        else if (!account.isEmpty())
+            who = u" : %1"_s.arg(account);
+        else if (!host.isEmpty())
+            who = u" (%1)"_s.arg(host);
+        QString when = u"en ce moment"_s;
+        if (st.lastActivity) {
+            const qint64 minutes = qMax<qint64>(now() - *st.lastActivity, 0) / 60;
+            if (minutes == 1)
+                when = u"il y a 1 min"_s;
+            else if (minutes > 1)
+                when = u"il y a %1 min"_s.arg(minutes);
+        }
+        return {Phase::Helping, u"Dépannage en cours"_s,
+                u"La personne qui vous dépanne travaille sur cet ordinateur%1. Dernière activité : %2."_s.arg(who, when)};
+    }
+    if (st.backend == "Running"_L1)
+        return {Phase::Ready, u"Prêt pour le dépannage"_s,
+                u"L'ordinateur est joignable. La personne qui vous dépanne peut se connecter."_s};
+    if (st.authUrl)
+        return {Phase::Link, u"Envoyez ce lien"_s,
+                u"Envoyez ce lien à la personne qui vous dépanne (SMS, e-mail…). Elle doit l'ouvrir pour se connecter."_s};
+    return {Phase::Preparing, u"Préparation…"_s, u"Démarrage de la connexion sécurisée."_s};
+}
+
 Status status() {
     const auto saved = load();
     Status st;
