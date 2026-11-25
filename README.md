@@ -62,6 +62,11 @@ Dès que l'ordinateur est connecté, sa fenêtre affiche un tchat. La personne q
 la liste : le tchat est à droite de sa page, aucune commande à taper. Une notification signale un message si la fenêtre n'est pas au premier
 plan ; si la personne dépannée a fermé la sienne, un message reçu la rouvre.
 
+Chaque message commence par le nom de celui qui l'écrit : le nom de session de la personne
+dépannée, celui de la personne qui dépanne, ou « Claude » pour l'assistant. Claude Code ne
+lit pas le tchat et n'y écrit pas, sauf si la personne qui dépanne coche « Claude peut lire le
+tchat et y écrire » dans la page de l'ordinateur, ou le lui demande expressément.
+
 Les deux côtés ont un bouton d'émoticônes, et celles qui sont tapées au clavier (`:)`, `;)`,
 `<3`…) sont remplacées à l'envoi. La personne dépannée voit le nom sous lequel la personne
 qui dépanne se présente : son nom de session, donné par Packarch Admin à chaque dépannage

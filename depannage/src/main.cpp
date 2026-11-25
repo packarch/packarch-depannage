@@ -39,7 +39,8 @@ En root (pkexec, ou par la fenêtre) :
   extend [MINUTES]        prolonge la session (60 min par défaut)
   stop                    arrête la session
   cleanup                 arrête une session restée ouverte (démarrage de l'ordinateur)
-  chat-say                envoie à l'utilisateur le message lu sur l'entrée standard
+  chat-say [NOM]          envoie à l'utilisateur le message lu sur l'entrée standard, au nom
+                          de NOM (par défaut : la personne qui dépanne)
   chat-follow             affiche les messages du tchat au fil de l'eau (JSON)
   helper-set              enregistre le nom de la personne qui dépanne, lu sur l'entrée standard
   key-set                 enregistre la clé de connexion lue sur l'entrée standard : les
@@ -129,7 +130,7 @@ int main(int argc, char** argv) {
     } else if (command == "connect"_L1) {
         error = session::connectRun();
     } else if (command == "chat-say"_L1) {
-        error = chatfile::say();
+        error = chatfile::say(args.value(1));
     } else if (command == "chat-follow"_L1) {
         error = chatfile::follow();
     } else if (command == "-h"_L1 || command == "--help"_L1 || command == "help"_L1) {

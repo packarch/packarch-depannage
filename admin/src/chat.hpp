@@ -21,6 +21,15 @@ QString helperName();
 /// version qui ne connaît pas la commande)
 void announceHelper(const Machine& machine, QObject* parent);
 
+/// Fichier dont la présence autorise l'assistant (Claude Code) à lire le tchat de
+/// HOST et à y écrire : créé par la case à cocher de la page, retiré quand elle
+/// est décochée, quand la page se ferme ou à la fin de la session du bureau
+/// (dossier d'exécution). Vide si le nom de l'ordinateur est inattendu.
+QString assistantFlag(const QString& host);
+/// Retire toutes ces autorisations : au lancement, aucune case n'est cochée (une
+/// autorisation restée d'un arrêt brutal ne vaut plus)
+void clearAssistantFlags();
+
 /// Options de ssh vers un ordinateur dépanné. Pas de vérification de la clé
 /// d'hôte : elle change à chaque session (état en mémoire), et le réseau
 /// Tailscale authentifie déjà la machine jointe par son adresse.

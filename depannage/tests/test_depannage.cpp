@@ -91,10 +91,15 @@ private slots:
         QVERIFY(!chat::parseLine("{pas du json"));
         QVERIFY(!chat::parseLine(R"({"from":"root","time":1,"text":"x"})"));
         QVERIFY(!chat::parseLine(R"({"from":"user","time":1,"text":" \u001b "})"));
-        const ChatMessage expected{false, 1, u"ok"_s};
+        const ChatMessage expected{false, 1, u"ok"_s, {}};
         QCOMPARE(chat::parseLine(R"({"from":"helper","time":1,"text":"ok"})").value(), expected);
         // Le format écrit est celui qui est lu
-        QCOMPARE(chat::parseLine(chat::toLine({true, 5, u"ça va ?"_s}).trimmed()).value(), (ChatMessage{true, 5, u"ça va ?"_s}));
+        QCOMPARE(chat::parseLine(chat::toLine({true, 5, u"ça va ?"_s, {}}).trimmed()).value(), (ChatMessage{true, 5, u"ça va ?"_s, {}}));
+        // Le nom affiché devant le message : gardé s'il est présentable, sinon ignoré
+        QCOMPARE(chat::parseLine(chat::toLine({false, 6, u"je regarde"_s, u"Claude"_s}).trimmed()).value().name, u"Claude"_s);
+        QVERIFY(chat::parseLine(R"({"from":"helper","time":1,"text":"ok","name":"<b>root</b>"})").value().name.isEmpty());
+        QVERIFY(chat::parseLine(R"({"from":"user","time":1,"text":"ok","name":7})").value().name.isEmpty());
+        QCOMPARE(chat::shown(u"antidote"_s, u"bonjour"_s), u"antidote: bonjour"_s);
     }
 
     void notificationFitsTwoLines() {
@@ -130,6 +135,12 @@ private slots:
         write("", QIODevice::WriteOnly);
         QVERIFY(chatfile::appendTo(p, true, u"x"_s).isEmpty());
         QCOMPARE(chatfile::readNew(p, pos).value(0).text, u"x"_s);
+        // Message signé : le nom est écrit avec lui ; un nom inattendu n'est pas écrit
+        QVERIFY(chatfile::appendTo(p, false, u"je m'en occupe"_s, u"Claude"_s).isEmpty());
+        QVERIFY(chatfile::appendTo(p, true, u"merci"_s, u"caro\n{}"_s).isEmpty());
+        const auto signedMessages = chatfile::readNew(p, pos);
+        QCOMPARE(signedMessages.value(0).name, u"Claude"_s);
+        QVERIFY(signedMessages.value(1).name.isEmpty());
         // Sans fichier (pas de session) : une erreur, rien de créé
         QVERIFY(!chatfile::appendTo(dir.filePath(u"absent"_s), true, u"x"_s).isEmpty());
         QVERIFY(!QFile::exists(dir.filePath(u"absent"_s)));

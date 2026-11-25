@@ -100,6 +100,10 @@ Error connectRun();
 Error setHelper();
 /// Nom présentable : court, des lettres, des chiffres, espaces et « -_. »
 bool validHelperName(const QString& name);
+/// Nom donné par la personne qui dépanne pour cette session (vide s'il n'y en a pas)
+QString helperName();
+/// Nom de session de l'utilisateur de ce programme : celui de ses messages
+QString userName();
 /// KEY a la forme d'une clé d'autorisation Tailscale (elle est passée à tailscale)
 bool validKey(const QString& key);
 

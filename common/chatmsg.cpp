@@ -6,9 +6,21 @@
 #include <QPair>
 #include <QStringList>
 
+#include <algorithm>
+
 using namespace Qt::StringLiterals;
 
 namespace chat {
+
+bool validName(const QString& name) {
+    if (name.isEmpty() || name.size() > 32 || name != name.trimmed())
+        return false;
+    return std::ranges::all_of(name, [](QChar c) { return c.isLetterOrNumber() || u" -_."_s.contains(c); });
+}
+
+QString shown(const QString& name, const QString& text) {
+    return u"%1: %2"_s.arg(name, text);
+}
 
 QString clean(const QString& text) {
     QString out;
@@ -35,7 +47,10 @@ std::optional<ChatMessage> parseLine(const QByteArray& line) {
         return std::nullopt;
     if (!o.value("time"_L1).isDouble() || !o.value("text"_L1).isString())
         return std::nullopt;
-    ChatMessage m{from == "user"_L1, o.value("time"_L1).toInteger(), clean(o.value("text"_L1).toString())};
+    ChatMessage m{from == "user"_L1, o.value("time"_L1).toInteger(), clean(o.value("text"_L1).toString()), {}};
+    // Un nom inattendu n'est pas affiché : le nom par défaut le remplace
+    if (const QString name = o.value("name"_L1).toString(); validName(name))
+        m.name = name;
     if (m.text.isEmpty())
         return std::nullopt;
     return m;
@@ -69,6 +84,8 @@ QByteArray toLine(const ChatMessage& message) {
     o.insert("from"_L1, message.fromUser ? u"user"_s : u"helper"_s);
     o.insert("time"_L1, message.time);
     o.insert("text"_L1, message.text);
+    if (!message.name.isEmpty())
+        o.insert("name"_L1, message.name);
     return QJsonDocument(o).toJson(QJsonDocument::Compact) + '\n';
 }
 

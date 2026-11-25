@@ -1,6 +1,7 @@
 #include "session.hpp"
 
 #include "chatfile.hpp"
+#include "chatmsg.hpp"
 #include "tailscale.hpp"
 
 #include <QDateTime>
@@ -14,6 +15,7 @@
 #include <QTextStream>
 #include <QThread>
 
+#include <pwd.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -385,9 +387,21 @@ Error setKey() {
 }
 
 bool validHelperName(const QString& name) {
-    if (name.isEmpty() || name.size() > 32 || name != name.trimmed())
-        return false;
-    return std::ranges::all_of(name, [](QChar c) { return c.isLetterOrNumber() || u" -_."_s.contains(c); });
+    return chat::validName(name);
+}
+
+QString helperName() {
+    QFile helper(HELPER);
+    if (!helper.open(QIODevice::ReadOnly))
+        return {};
+    const QString name = QString::fromUtf8(helper.read(400)).trimmed();
+    return chat::validName(name) ? name : QString();
+}
+
+QString userName() {
+    const passwd* user = ::getpwuid(::getuid());
+    const QString name = user ? QString::fromLocal8Bit(user->pw_name) : QString();
+    return chat::validName(name) ? name : u"Vous"_s;
 }
 
 Error setHelper() {
@@ -496,11 +510,8 @@ Status status() {
         }
     }
     // Le nom sous lequel la personne qui dépanne s'est présentée, plutôt que celui de son compte Tailscale
-    if (QFile helper(HELPER); helper.open(QIODevice::ReadOnly)) {
-        const QString name = QString::fromUtf8(helper.read(400)).trimmed();
-        if (validHelperName(name))
-            st.helperName = name;
-    }
+    if (const QString name = helperName(); !name.isEmpty())
+        st.helperName = name;
     st.sshSessions = sshSessions();
     return st;
 }

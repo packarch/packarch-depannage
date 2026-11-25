@@ -11,6 +11,9 @@ struct ChatMessage {
     bool fromUser = false;  ///< de la personne dépannée (sinon : de la personne qui dépanne)
     qint64 time = 0;
     QString text;
+    /// Nom affiché devant le message (« antidote », « Claude », le nom de session de la
+    /// personne) ; vide pour un message d'une version qui n'en donnait pas
+    QString name;
     bool operator==(const ChatMessage&) const = default;
 };
 
@@ -18,6 +21,12 @@ namespace chat {
 
 /// Longueur maximale d'un message (caractères)
 inline constexpr int MAX_CHARS = 2000;
+
+/// Nom présentable : court, des lettres, des chiffres, espaces et « -_. »
+bool validName(const QString& name);
+
+/// Le message tel qu'il est affiché : « NOM: texte »
+QString shown(const QString& name, const QString& text);
 
 /// Texte d'un message : sans caractères de contrôle, sans blancs autour, borné
 QString clean(const QString& text);

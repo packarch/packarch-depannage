@@ -1,6 +1,8 @@
 #include "chat.hpp"
 
+#include <QDir>
 #include <QProcess>
+#include <QStandardPaths>
 #include <QTimer>
 
 #include <pwd.h>
@@ -62,6 +64,18 @@ void announceHelper(const Machine& machine, QObject* parent) {
             say->deleteLater();
     });
     say->start();
+}
+
+QString assistantFlag(const QString& host) {
+    if (!tailnet::validHost(host))
+        return {};
+    return u"%1/packarch-admin/tchat-claude/%2"_s.arg(QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation), host);
+}
+
+void clearAssistantFlags() {
+    QDir dir(QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation) + u"/packarch-admin/tchat-claude"_s);
+    for (const QString& name : dir.entryList(QDir::Files))
+        dir.remove(name);
 }
 
 QStringList sshOptions(bool batch) {

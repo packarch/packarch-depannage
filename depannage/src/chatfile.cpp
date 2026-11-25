@@ -105,11 +105,11 @@ QList<ChatMessage> readNew(const QString& path, qint64& pos) {
     return messages;
 }
 
-QString appendTo(const QString& path, bool fromUser, const QString& text) {
+QString appendTo(const QString& path, bool fromUser, const QString& text, const QString& name) {
     const QString cleaned = chat::clean(text);
     if (cleaned.isEmpty())
         return {};
-    const QByteArray line = chat::toLine({fromUser, session::now(), cleaned});
+    const QByteArray line = chat::toLine({fromUser, session::now(), cleaned, chat::validName(name) ? name : QString()});
     // Le fichier doit exister : il est créé par root (ensure)
     const int fd = ::open(QFile::encodeName(path).constData(), O_WRONLY | O_APPEND | O_CLOEXEC);
     if (fd < 0)
@@ -162,9 +162,11 @@ void announceStop() {
     }
 }
 
-QString say() {
+QString say(const QString& name) {
     if (const QString e = session::requireRoot(); !e.isEmpty())
         return e;
+    if (!name.isEmpty() && !chat::validName(name))
+        return u"nom inattendu"_s;
     if (!session::active())
         return u"aucune session en cours"_s;
     QFile in;
@@ -173,7 +175,7 @@ QString say() {
     const QString text = QString::fromUtf8(in.readAll());
     if (const QString e = ensure(); !e.isEmpty())
         return e;
-    if (const QString e = appendTo(CHAT, false, chat::withEmoji(text)); !e.isEmpty())
+    if (const QString e = appendTo(CHAT, false, chat::withEmoji(text), name.isEmpty() ? session::helperName() : name); !e.isEmpty())
         return e;
     if (!windowOpen())
         desktop::sessionRun({u"cd ~ && setsid -f packarch-depannage >/dev/null 2>&1"_s});

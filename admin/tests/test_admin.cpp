@@ -85,6 +85,12 @@ private slots:
         QCOMPARE(screen::frameSize("F abc"), -1);
     }
 
+    void assistantFlagOnlyForPlainNames() {
+        QVERIFY(chat::assistantFlag(u"packarch-caro"_s).endsWith(u"/packarch-admin/tchat-claude/packarch-caro"_s));
+        QVERIFY(chat::assistantFlag(u"../../etc/passwd"_s).isEmpty());
+        QVERIFY(chat::assistantFlag(u"Packarch Caro"_s).isEmpty());
+    }
+
     void connectionKeyRequest() {
         QCOMPARE(keys::clientId(u"tskey-client-kAbc123CNTRL-xYz789"_s), u"kAbc123CNTRL"_s);
         QVERIFY(keys::clientId(u"tskey-auth-kAbc123CNTRL-xYz789"_s).isEmpty());

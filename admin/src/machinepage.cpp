@@ -7,9 +7,12 @@
 #include "screenview.hpp"
 
 #include <QApplication>
+#include <QCheckBox>
 #include <QClipboard>
 #include <QDateTime>
+#include <QDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
@@ -128,7 +131,14 @@ MachinePage::MachinePage(Machine machine, QWidget* parent)
     inputRow->addWidget(emoji::button(input_));
     inputRow->addWidget(send_);
     chatLayout->addWidget(chatTitle);
+    // Sans cette case, l'assistant ne lit pas le tchat et n'y écrit pas
+    auto* assistant = new QCheckBox(u"Claude peut lire le tchat et y écrire"_s);
+    assistant->setToolTip(u"Décochée : Claude Code ne lit pas le tchat et n'écrit pas à la personne.\n"
+                          "Cochée : il suit ses messages et lui répond, sous le nom « Claude »."_s);
+    assistant->setEnabled(!chat::assistantFlag(machine_.host).isEmpty());
+    connect(assistant, &QCheckBox::toggled, this, &MachinePage::allowAssistant);
     chatLayout->addWidget(banner_);
+    chatLayout->addWidget(assistant);
     chatLayout->addWidget(log_, 1);
     chatLayout->addLayout(inputRow);
     connect(send_, &QPushButton::clicked, this, &MachinePage::sendInput);
@@ -279,10 +289,36 @@ void MachinePage::openClaude() {
 }
 
 void MachinePage::append(const ChatMessage& m) {
-    const QString who = m.fromUser ? tailnet::shownHost(machine_.host) : u"Vous"_s;
-    const QString when = QDateTime::fromSecsSinceEpoch(m.time).toString(u"HH 'h' mm"_s);
+    // Chaque message commence par le nom de celui qui l'écrit : celui qu'il porte
+    // (« Claude », le nom de session de la personne), sinon le nôtre ou celui de l'ordinateur
+    const QString name = !m.name.isEmpty() ? m.name
+                       : m.fromUser ? tailnet::shownHost(machine_.host)
+                       : chat::helperName();
+    if (const QString time = QDateTime::fromSecsSinceEpoch(m.time).toString(u"HH 'h' mm"_s); time != chatTime_) {
+        chatTime_ = time;
+        log_->appendPlainText(u"— %1 —"_s.arg(time));
+    }
     // Du texte, jamais de balisage
-    log_->appendPlainText(u"%1 · %2\n%3\n"_s.arg(who, when, m.text));
+    log_->appendPlainText(chat::shown(name, m.text));
+}
+
+void MachinePage::allowAssistant(bool allowed) {
+    const QString flag = chat::assistantFlag(machine_.host);
+    if (flag.isEmpty())
+        return;
+    if (allowed) {
+        QDir().mkpath(QFileInfo(flag).path());
+        QFile f(flag);
+        if (f.open(QIODevice::WriteOnly))
+            f.write(machine_.ip.toUtf8() + '\n');
+    } else {
+        QFile::remove(flag);
+    }
+}
+
+MachinePage::~MachinePage() {
+    // La page fermée, l'autorisation ne vaut plus
+    allowAssistant(false);
 }
 
 void MachinePage::sendInput() {

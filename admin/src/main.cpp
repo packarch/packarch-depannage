@@ -5,6 +5,7 @@
 // son icône dans la zone de notification, qui reste quand la fenêtre est fermée
 // et prévient quand un ordinateur arrive.
 
+#include "chat.hpp"
 #include "mainwindow.hpp"
 #include "singleinstance.hpp"
 #include "theme.hpp"
@@ -58,6 +59,7 @@ int main(int argc, char** argv) {
         return 0;
 
     linkSkill();
+    chat::clearAssistantFlags();
     MainWindow window;
     QObject::connect(&instance, &SingleInstance::showRequested, &window, [&window] { window.showMachine(); });
     if (!parser.isSet(trayOption))

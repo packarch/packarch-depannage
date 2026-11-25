@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 3.21)
 # - packarch-admin : la personne qui dépanne (dossier admin) ;
 # - common : ce qu'ils partagent.
 # Une seule version pour les deux programmes : celle du tag du dépôt
-project(packarch-depannage VERSION 0.4.5 LANGUAGES CXX)
+project(packarch-depannage VERSION 0.4.6 LANGUAGES CXX)
 
 option(BUILD_DEPANNAGE "packarch-depannage (ordinateur dépanné)" ON)
 option(BUILD_ADMIN "packarch-admin (personne qui dépanne ; demande qtermwidget)" ON)

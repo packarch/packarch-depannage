@@ -144,8 +144,10 @@ int run() {
     // L'historique d'une session déjà commencée est affiché une fois
     while (true) {
         for (const ChatMessage& m : chatfile::readNew(chatfile::CHAT, chatPos)) {
-            const QString who = m.fromUser ? u"Vous"_s : st.helperName.value_or(u"La personne qui vous dépanne"_s);
-            say(u"[%1] %2 : %3"_s.arg(localTime(m.time), who, m.text));
+            const QString name = !m.name.isEmpty() ? m.name
+                               : m.fromUser ? session::userName()
+                               : st.helperName.value_or(u"La personne qui vous dépanne"_s);
+            say(u"[%1] %2"_s.arg(localTime(m.time), chat::shown(name, m.text)));
         }
         bool closed = false;
         const std::optional<QString> line = readLine(closed);
@@ -166,7 +168,7 @@ int run() {
                     show(session::status());
             } else if (line->startsWith(u'/')) {
                 help();
-            } else if (const QString error = chatfile::appendTo(chatfile::CHAT, true, chat::withEmoji(*line)); !error.isEmpty()) {
+            } else if (const QString error = chatfile::appendTo(chatfile::CHAT, true, chat::withEmoji(*line), session::userName()); !error.isEmpty()) {
                 say(u"Message non envoyé (%1) : le tchat fonctionne une fois l'ordinateur connecté."_s.arg(error));
             }
         }

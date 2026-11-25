@@ -18,6 +18,7 @@ class MachinePage : public QWidget {
     Q_OBJECT
 public:
     explicit MachinePage(Machine machine, QWidget* parent = nullptr);
+    ~MachinePage() override;
     const Machine& machine() const { return machine_; }
     /// L'ordinateur a quitté le réseau
     void setGone();
@@ -38,6 +39,8 @@ private:
     void sendInput();
     void setBanner(const QString& text);
     void setSendable(bool sendable);
+    /// Autorise ou non l'assistant à lire le tchat et à y écrire (fichier témoin)
+    void allowAssistant(bool allowed);
     void fetchInfo();
     void showInfoMessage(const QString& text);
 
@@ -56,6 +59,8 @@ private:
     QLineEdit* input_;
     QPushButton* send_;
     int terminals_ = 0;
+    /// Heure du dernier message affiché (rappelée quand elle change)
+    QString chatTime_;
     /// Onglet de l'écran (un seul)
     QWidget* screen_ = nullptr;
     bool gone_ = false;

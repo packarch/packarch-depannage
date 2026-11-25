@@ -21,7 +21,8 @@ inline const QString CHAT = QStringLiteral("/run/packarch-depannage/chat.jsonl")
 /// Lignes complètes écrites depuis la position POS, qui avance
 QList<ChatMessage> readNew(const QString& path, qint64& pos);
 /// Ajoute un message (une seule écriture, en fin de fichier) ; rend une erreur, vide si tout va bien
-QString appendTo(const QString& path, bool fromUser, const QString& text);
+/// NAME : nom affiché devant le message.
+QString appendTo(const QString& path, bool fromUser, const QString& text, const QString& name = {});
 /// Crée le fichier du tchat et le donne à l'utilisateur (root) : celui qui a
 /// autorisé le dépannage (pkexec), sinon celui du bureau
 QString ensure();
@@ -31,7 +32,9 @@ void announceStop();
 /// packarch-depannage chat-say (root) : envoie le texte lu sur l'entrée standard
 /// (pas d'argument : le texte ne passe pas par le shell distant) et rouvre la
 /// fenêtre de l'utilisateur si elle est fermée
-QString say();
+/// NAME : nom affiché devant le message (« Claude ») ; vide : celui que la personne
+/// qui dépanne a donné pour la session (helper-set).
+QString say(const QString& name = {});
 /// packarch-depannage chat-follow (root) : écrit les messages, depuis le début,
 /// au fil de l'eau, jusqu'à la fin de la session ou de la connexion. Une ligne
 /// vide de temps en temps (la première : connexion établie).

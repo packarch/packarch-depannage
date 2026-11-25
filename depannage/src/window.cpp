@@ -262,14 +262,22 @@ void Window::pollChat() {
     if (!QFile::exists(chatfile::CHAT)) {
         if (chatPos_ > 0)
             log_->clear();
+        chatTime_.clear();
         chatPos_ = 0;
         // Fichier neuf : ses messages arriveront en direct
         chatLive_ = true;
     }
-    const QString other = status_.helperName.value_or(u"La personne qui vous dépanne"_s);
     for (const ChatMessage& m : chatfile::readNew(chatfile::CHAT, chatPos_)) {
+        // Chaque message commence par le nom de celui qui l'écrit ; l'heure, quand elle change
+        const QString name = !m.name.isEmpty() ? m.name
+                           : m.fromUser ? session::userName()
+                           : status_.helperName.value_or(u"La personne qui vous dépanne"_s);
+        if (const QString time = localTime(m.time); time != chatTime_) {
+            chatTime_ = time;
+            log_->appendPlainText(u"— %1 —"_s.arg(time));
+        }
         // Du texte, jamais de balisage
-        log_->appendPlainText(u"%1 · %2\n%3\n"_s.arg(m.fromUser ? u"Vous"_s : other, localTime(m.time), m.text));
+        log_->appendPlainText(chat::shown(name, m.text));
         if (chatLive_ && !m.fromUser && !(isVisible() && isActiveWindow())) {
             QProcess::startDetached(u"notify-send"_s, {u"--app-name=packarch-depannage"_s, u"--"_s,
                                                        u"Dépannage : message reçu"_s, chat::notificationBody(m.text)});
@@ -282,7 +290,7 @@ void Window::sendInput() {
     const QString text = chat::withEmoji(chat::clean(input_->text()));
     if (text.isEmpty())
         return;
-    const QString error = chatfile::appendTo(chatfile::CHAT, true, text);
+    const QString error = chatfile::appendTo(chatfile::CHAT, true, text, session::userName());
     if (!error.isEmpty()) {
         toast(u"Message non envoyé : %1"_s.arg(error));
         return;
