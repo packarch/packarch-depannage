@@ -2,16 +2,25 @@
 
 #include "terminal.hpp"
 
+#include "info.hpp"
+#include "screenview.hpp"
+
+#include <QApplication>
+#include <QClipboard>
 #include <QDateTime>
+#include <QFile>
 #include <QHBoxLayout>
+#include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPlainTextEdit>
+#include <QProcess>
 #include <QPushButton>
 #include <QSplitter>
 #include <QTabBar>
 #include <QTabWidget>
 #include <QTimer>
+#include <QTreeWidget>
 #include <QVBoxLayout>
 #include <qtermwidget.h>
 
@@ -27,8 +36,8 @@ MachinePage::MachinePage(Machine machine, QWidget* parent)
     tabs_->setDocumentMode(true);
     auto* home = new QWidget;
     auto* homeLayout = new QVBoxLayout(home);
-    homeLayout->setAlignment(Qt::AlignCenter);
-    homeLayout->setSpacing(12);
+    homeLayout->setContentsMargins(16, 12, 16, 12);
+    homeLayout->setSpacing(8);
     auto* title = new QLabel(u"<h2>%1</h2>"_s.arg(name.toHtmlEscaped()));
     title->setAlignment(Qt::AlignCenter);
     auto* address = new QLabel(machine_.ip.toHtmlEscaped());
@@ -36,32 +45,61 @@ MachinePage::MachinePage(Machine machine, QWidget* parent)
     address->setEnabled(false);
     auto* root = new QPushButton(u"Terminal (root)"_s);
     auto* claude = new QPushButton(u"Dépanner avec Claude Code"_s);
-    for (QPushButton* b : {root, claude}) {
-        b->setMinimumSize(260, 40);
-    }
+    auto* screen = new QPushButton(u"Écran"_s);
+    for (QPushButton* b : {root, claude, screen})
+        b->setMinimumSize(190, 38);
+    screen->setEnabled(tailnet::validIp(machine_.ip));
     // Jamais avec un nom inattendu : il irait dans la demande à Claude
     const bool claudeReady = tailnet::validHost(machine_.host) && !terminal::findProgram(u"claude"_s).isEmpty();
     claude->setEnabled(claudeReady);
     if (!claudeReady)
         claude->setToolTip(u"Claude Code n'est pas installé, ou le nom de cet ordinateur est inattendu."_s);
     root->setEnabled(tailnet::validIp(machine_.ip));
-    homeLayout->addWidget(title);
-    homeLayout->addWidget(address);
-    homeLayout->addSpacing(12);
-    homeLayout->addWidget(root, 0, Qt::AlignCenter);
-    homeLayout->addWidget(claude, 0, Qt::AlignCenter);
+    auto* actions = new QHBoxLayout;
+    actions->addStretch();
+    actions->addWidget(root);
+    actions->addWidget(claude);
+    actions->addWidget(screen);
+    actions->addStretch();
     keyStatus_ = new QLabel;
     keyStatus_->setAlignment(Qt::AlignCenter);
     keyStatus_->setWordWrap(true);
     keyStatus_->setTextFormat(Qt::PlainText);
     keyStatus_->setEnabled(false);
-    homeLayout->addSpacing(12);
+
+    // Infos de l'ordinateur : lues à l'ouverture de la page
+    info_ = new QTreeWidget;
+    info_->setColumnCount(2);
+    info_->setHeaderHidden(true);
+    info_->setRootIsDecorated(false);
+    info_->setSelectionMode(QAbstractItemView::ExtendedSelection);
+    info_->setAlternatingRowColors(true);
+    info_->setTextElideMode(Qt::ElideRight);
+    info_->header()->setSectionResizeMode(0, QHeaderView::ResizeToContents);
+    info_->header()->setStretchLastSection(true);
+    refreshInfo_ = new QPushButton(u"Actualiser"_s);
+    copyInfo_ = new QPushButton(u"Copier"_s);
+    auto* infoBar = new QHBoxLayout;
+    infoBar->addWidget(new QLabel(u"<b>Infos de l'ordinateur</b>"_s));
+    infoBar->addStretch();
+    infoBar->addWidget(copyInfo_);
+    infoBar->addWidget(refreshInfo_);
+    connect(refreshInfo_, &QPushButton::clicked, this, &MachinePage::fetchInfo);
+    connect(copyInfo_, &QPushButton::clicked, this, [this] { QApplication::clipboard()->setText(infoText_); });
+
+    homeLayout->addWidget(title);
+    homeLayout->addWidget(address);
+    homeLayout->addLayout(actions);
     homeLayout->addWidget(keyStatus_);
+    homeLayout->addSpacing(6);
+    homeLayout->addLayout(infoBar);
+    homeLayout->addWidget(info_, 1);
     tabs_->addTab(home, u"Ordinateur"_s);
     tabs_->tabBar()->setTabButton(0, QTabBar::RightSide, nullptr);
     tabs_->tabBar()->setTabButton(0, QTabBar::LeftSide, nullptr);
     connect(root, &QPushButton::clicked, this, &MachinePage::openRootTerminal);
     connect(claude, &QPushButton::clicked, this, &MachinePage::openClaude);
+    connect(screen, &QPushButton::clicked, this, &MachinePage::openScreen);
     connect(tabs_, &QTabWidget::tabCloseRequested, this, [this](int index) {
         if (index > 0)
             tabs_->widget(index)->deleteLater();
@@ -105,6 +143,7 @@ MachinePage::MachinePage(Machine machine, QWidget* parent)
 
     setBanner(u"Connexion à l'ordinateur…"_s);
     setSendable(false);
+    fetchInfo();
     connect(chat_, &ChatSession::connected, this, [this] {
         setBanner({});
         setSendable(true);
@@ -137,6 +176,67 @@ void MachinePage::setGone() {
     chat_->setGone();
 }
 
+void MachinePage::showInfoMessage(const QString& text) {
+    info_->clear();
+    auto* item = new QTreeWidgetItem(info_, {text});
+    item->setFirstColumnSpanned(true);
+    item->setDisabled(true);
+}
+
+void MachinePage::fetchInfo() {
+    if (infoProcess_ || !tailnet::validIp(machine_.ip))
+        return;
+    QFile script(u":/infos.sh"_s);
+    if (!script.open(QIODevice::ReadOnly))
+        return;
+    const QByteArray commands = script.readAll();
+    refreshInfo_->setEnabled(false);
+    copyInfo_->setEnabled(false);
+    showInfoMessage(u"Lecture des infos de l'ordinateur…"_s);
+    // Le script passe par l'entrée standard de ssh : rien n'est installé ni écrit là-bas
+    infoProcess_ = new QProcess(this);
+    QStringList args = chat::sshOptions(true);
+    args << u"root@%1"_s.arg(machine_.ip) << u"sh -s"_s;
+    connect(infoProcess_, &QProcess::started, infoProcess_, [this, commands] {
+        infoProcess_->write(commands);
+        infoProcess_->closeWriteChannel();
+    });
+    const auto done = [this](bool started) {
+        const auto sections = info::parse(infoProcess_->readAllStandardOutput());
+        infoProcess_->deleteLater();
+        infoProcess_ = nullptr;
+        refreshInfo_->setEnabled(true);
+        if (sections.isEmpty()) {
+            showInfoMessage(started ? u"Infos illisibles (connexion à l'ordinateur perdue ?)."_s
+                                    : u"ssh n'a pas pu être lancé."_s);
+            return;
+        }
+        infoText_ = info::toText(sections);
+        copyInfo_->setEnabled(true);
+        info_->clear();
+        QFont bold = info_->font();
+        bold.setBold(true);
+        for (const info::Section& section : sections) {
+            auto* head = new QTreeWidgetItem(info_, {section.title});
+            head->setFirstColumnSpanned(true);
+            head->setFont(0, bold);
+            head->setFlags(Qt::ItemIsEnabled);
+            for (const info::Row& row : section.rows) {
+                // Du texte, jamais de balisage ; la valeur entière en infobulle si elle est coupée
+                auto* item = new QTreeWidgetItem(info_, {u"  "_s + row.label, row.value});
+                item->setToolTip(1, row.value.toHtmlEscaped());
+            }
+        }
+    };
+    connect(infoProcess_, &QProcess::finished, this, [done] { done(true); });
+    connect(infoProcess_, &QProcess::errorOccurred, this, [done](QProcess::ProcessError error) {
+        if (error == QProcess::FailedToStart)
+            done(false);
+    });
+    infoProcess_->setStandardErrorFile(QProcess::nullDevice());
+    infoProcess_->start(u"ssh"_s, args);
+}
+
 void MachinePage::setKeyStatus(const QString& text) {
     keyStatus_->setText(text);
 }
@@ -157,6 +257,15 @@ void MachinePage::openRootTerminal() {
     QStringList args = chat::sshOptions(false);
     args << u"root@%1"_s.arg(machine_.ip);
     addTerminal(terminal::create(u"ssh"_s, args, tabs_), u"root %1"_s.arg(++terminals_));
+}
+
+void MachinePage::openScreen() {
+    if (!screen_) {
+        screen_ = new ScreenView(machine_, tabs_);
+        tabs_->addTab(screen_, u"Écran"_s);
+        connect(screen_, &QObject::destroyed, this, [this] { screen_ = nullptr; });
+    }
+    tabs_->setCurrentWidget(screen_);
 }
 
 void MachinePage::openClaude() {

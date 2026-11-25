@@ -77,6 +77,27 @@ La fenêtre liste les ordinateurs à dépanner du réseau Tailscale. La page d'u
 - « Dépanner avec Claude Code » : [Claude Code](https://claude.com/claude-code), s'il est
   installé, avec la demande « Ouvre un dépannage sur packarch-<nom> ».
 
+- « Écran » : l'**écran de la personne** (tous ses écrans, pointeur compris), en captures
+  continues dont le rythme suit le débit de sa connexion (« Légère » : demi-taille, pour une
+  connexion lente ; « Pause » ; « Enregistrer l'image »). Avec « Contrôler (souris et
+  clavier) », les gestes faits sur l'image sont rejoués chez elle : pointeur, clics, molette,
+  touches (celles du clavier, dans la disposition de son ordinateur). Rien n'est capturé quand
+  l'onglet n'est pas affiché.
+
+L'écran ne demande rien de plus sur l'ordinateur dépanné, quelle que soit sa version de
+packarch-depannage : les captures sont faites par `grim` (bureau Packarch, Wayland) ou `maim`
+(Openbox, XFCE), déjà installés, dans le bureau de l'utilisateur (`session-run`) ; la saisie
+par deux périphériques d'entrée virtuels du noyau (`/dev/uinput`), créés par un script Python
+de la bibliothèque standard et retirés à la fin. Les scripts sont dans `admin/data`.
+
+Le premier onglet, « Ordinateur », affiche les **infos de l'ordinateur**, lues à l'ouverture
+de la page : système (noyau, dernière mise à jour, services en échec, versions des paquets
+Packarch), session (utilisateur, bureau, écrans, thème), matériel (modèle, processeur, mémoire,
+carte graphique et son pilote, batterie), disques (place libre) et réseau. « Actualiser » les
+relit, « Copier » les met dans le presse-papiers. Elles sont lues par un script de Packarch
+Admin envoyé par Tailscale SSH (`admin/data/infos.sh`, qui ne fait que lire) : rien n'est
+installé sur l'ordinateur, et toutes les versions de packarch-depannage conviennent.
+
 Fermer la fenêtre la **réduit dans la zone de notification** : les terminaux et le tchat
 continuent, un clic sur l'icône la rouvre telle quelle (« Quitter » est dans le menu de
 l'icône, qui liste aussi les ordinateurs). L'icône est lancée à l'ouverture du bureau et

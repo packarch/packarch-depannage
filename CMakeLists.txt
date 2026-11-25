@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 3.21)
 # - packarch-admin : la personne qui dépanne (dossier admin) ;
 # - common : ce qu'ils partagent.
 # Une seule version pour les deux programmes : celle du tag du dépôt
-project(packarch-depannage VERSION 0.4.3 LANGUAGES CXX)
+project(packarch-depannage VERSION 0.4.4 LANGUAGES CXX)
 
 option(BUILD_DEPANNAGE "packarch-depannage (ordinateur dépanné)" ON)
 option(BUILD_ADMIN "packarch-admin (personne qui dépanne ; demande qtermwidget)" ON)
@@ -82,7 +82,9 @@ if(BUILD_ADMIN)
   add_library(admin-core STATIC
     admin/src/tailnet.cpp admin/src/tailnet.hpp
     admin/src/chat.cpp admin/src/chat.hpp
-    admin/src/keys.cpp admin/src/keys.hpp)
+    admin/src/keys.cpp admin/src/keys.hpp
+    admin/src/info.cpp admin/src/info.hpp
+    admin/src/screenproto.cpp admin/src/screenproto.hpp)
   target_link_libraries(admin-core PUBLIC common)
   target_include_directories(admin-core PUBLIC admin/src)
 
@@ -90,9 +92,12 @@ if(BUILD_ADMIN)
     admin/src/main.cpp
     admin/src/mainwindow.cpp admin/src/mainwindow.hpp
     admin/src/machinepage.cpp admin/src/machinepage.hpp
+    admin/src/screenview.cpp admin/src/screenview.hpp
     admin/src/terminal.cpp admin/src/terminal.hpp)
   target_compile_definitions(packarch-admin PRIVATE APP_VERSION="${PROJECT_VERSION}")
   target_link_libraries(packarch-admin PRIVATE admin-core Qt6::Widgets qtermwidget6)
+  # Scripts envoyés à l'ordinateur dépanné (infos, écran, saisie), embarqués dans le programme
+  qt_add_resources(packarch-admin admin-data PREFIX / BASE admin/data FILES admin/data/infos.sh admin/data/capture.sh admin/data/saisie.py)
 
   add_executable(test_admin admin/tests/test_admin.cpp)
   target_link_libraries(test_admin PRIVATE admin-core Qt6::Test)

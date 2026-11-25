@@ -1,5 +1,7 @@
 #include "chat.hpp"
+#include "info.hpp"
 #include "keys.hpp"
+#include "screenproto.hpp"
 #include "tailnet.hpp"
 
 #include <QJsonArray>
@@ -41,6 +43,46 @@ private slots:
         QVERIFY(!tailnet::validIp(u"-oProxyCommand=x"_s));
         QVERIFY(!tailnet::validIp(u"packarch-caro"_s));
         QVERIFY(!tailnet::validIp(u""_s));
+    }
+
+    void machineInfoIsOnlyText() {
+        const auto sections = info::parse("== Matériel ==\nProcesseur\tIntel Core i7 (4 fils)\nligne sans tabulation\n"
+                                          "Carte graphique\tAMD \x1b[31mRadeon\n\tsans libellé\nVide\t  \n"
+                                          "== Réseau ==\nInternet\tjoignable\n");
+        const QList<info::Section> expected{
+            {u"Matériel"_s, {{u"Processeur"_s, u"Intel Core i7 (4 fils)"_s}, {u"Carte graphique"_s, u"AMD [31mRadeon"_s}}},
+            {u"Réseau"_s, {{u"Internet"_s, u"joignable"_s}}}};
+        QCOMPARE(sections, expected);
+        QCOMPARE(info::toText(sections),
+                 u"== Matériel ==\nProcesseur      : Intel Core i7 (4 fils)\nCarte graphique : AMD [31mRadeon\n\n"
+                 "== Réseau ==\nInternet        : joignable\n"_s);
+        // Sortie démesurée : bornée
+        QVERIFY(info::parse(QByteArray(200000, 'a') + "\nx\ty\n").isEmpty());
+        QCOMPARE(info::parse("a\t" + QByteArray(1000, 'b') + "\n").first().rows.first().value.size(), 300);
+    }
+
+    void screenGeometryAndKeys() {
+        // Le pointeur : toute la largeur de l'image sur 0 à 32767, jamais en dehors
+        QCOMPARE(screen::pointerAxis(0, 800), 0);
+        QCOMPARE(screen::pointerAxis(799, 800), 32767);
+        QCOMPARE(screen::pointerAxis(399.5, 800), 16384);
+        QCOMPARE(screen::pointerAxis(-50, 800), 0);
+        QCOMPARE(screen::pointerAxis(5000, 800), 32767);
+        QCOMPARE(screen::pointerAxis(10, 0), 0);
+        // Les touches : code natif de Qt moins 8, dans les codes d'un clavier
+        QCOMPARE(screen::evdevKey(38), 30);
+        QCOMPARE(screen::evdevKey(0), 0);
+        QCOMPARE(screen::evdevKey(8), 0);
+        QCOMPARE(screen::evdevKey(9), 1);
+        QCOMPARE(screen::evdevKey(256), 248);
+        QCOMPARE(screen::evdevKey(257), 0);
+        // Les captures : « F OCTETS », d'une taille raisonnable
+        QCOMPARE(screen::frameSize("F 123720"), 123720);
+        QCOMPARE(screen::frameSize("E capture impossible"), -1);
+        QCOMPARE(screen::frameSize("F 0"), -1);
+        QCOMPARE(screen::frameSize("F -5"), -1);
+        QCOMPARE(screen::frameSize("F 99999999999"), -1);
+        QCOMPARE(screen::frameSize("F abc"), -1);
     }
 
     void connectionKeyRequest() {
