@@ -1,4 +1,5 @@
 #include "chatfile.hpp"
+#include "chatview.hpp"
 #include "session.hpp"
 
 #include <QJsonDocument>
@@ -68,6 +69,21 @@ private slots:
         QCOMPARE(chat::withEmoji(u"voir http://x:8080/a:)b et C:D"_s), u"voir http://x:8080/a:)b et C:D"_s);
         QCOMPARE(chat::withEmoji(u"ligne 1 ;)\n:("_s), u"ligne 1 😉\n😕"_s);
         QCOMPARE(chat::clean(u"ok 👍 ❤️"_s), u"ok 👍 ❤️"_s);
+    }
+
+    void chatLineKeepsTextAsText() {
+        ChatMessage m{false, 1, u"x"_s, u"Claude"_s};
+        QCOMPARE(ChatView::roleOf(m), ChatView::Role::Assistant);
+        m.name = u"antidote"_s;
+        QCOMPARE(ChatView::roleOf(m), ChatView::Role::Helper);
+        m.fromUser = true;
+        m.name = u"Claude"_s;  // la personne ne passe pas pour l'assistant en prenant son nom
+        QCOMPARE(ChatView::roleOf(m), ChatView::Role::Person);
+        const QString line = ChatView::html(u"caro"_s, u"<b>gras</b> & <a href='x'>lien</a>\nsuite"_s, u"23:55"_s, ChatView::Role::Person);
+        QVERIFY(line.contains(u"&lt;b&gt;gras&lt;/b&gt; &amp; &lt;a href="_s));
+        QVERIFY(line.contains(u"<br>suite"_s));
+        QVERIFY(line.contains(u">caro:</span>"_s) && line.contains(u"23:55"_s));
+        QVERIFY(!line.contains(u"<b>"_s) && !line.contains(u"<a "_s));
     }
 
     void connectionKeys() {

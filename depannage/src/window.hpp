@@ -9,7 +9,8 @@
 
 class QLabel;
 class QLineEdit;
-class QPlainTextEdit;
+class ChatView;
+class PacmanLogo;
 class QProcess;
 class QPushButton;
 
@@ -40,8 +41,6 @@ private:
     bool chatLive_ = false;
     /// L'état de la session est connu (le nom de la personne qui dépanne)
     bool statusKnown_ = false;
-    /// Heure du dernier message affiché (rappelée quand elle change)
-    QString chatTime_;
     /// Ce que la fenêtre montre (session, lien, tchat) : elle est redimensionnée quand cela change
     int shape_ = -1;
     bool shapeApplied_ = false;
@@ -55,7 +54,8 @@ private:
     QPushButton* extend_;
     QPushButton* stop_;
     QWidget* chat_;
-    QPlainTextEdit* log_;
+    ChatView* log_;
+    PacmanLogo* logo_;
     QLineEdit* input_;
     QPushButton* send_;
     QLabel* toast_;

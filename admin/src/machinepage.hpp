@@ -8,7 +8,7 @@
 
 class QLabel;
 class QLineEdit;
-class QPlainTextEdit;
+class ChatView;
 class QPushButton;
 class QTabWidget;
 class QTreeWidget;
@@ -55,12 +55,10 @@ private:
     QPushButton* copyInfo_;
     QProcess* infoProcess_ = nullptr;
     QString infoText_;
-    QPlainTextEdit* log_;
+    ChatView* log_;
     QLineEdit* input_;
     QPushButton* send_;
     int terminals_ = 0;
-    /// Heure du dernier message affiché (rappelée quand elle change)
-    QString chatTime_;
     /// Onglet de l'écran (un seul)
     QWidget* screen_ = nullptr;
     bool gone_ = false;

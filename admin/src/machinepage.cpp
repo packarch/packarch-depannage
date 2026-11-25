@@ -2,6 +2,7 @@
 
 #include "terminal.hpp"
 
+#include "chatview.hpp"
 #include "emoji.hpp"
 #include "info.hpp"
 #include "screenview.hpp"
@@ -17,7 +18,6 @@
 #include <QHeaderView>
 #include <QLabel>
 #include <QLineEdit>
-#include <QPlainTextEdit>
 #include <QProcess>
 #include <QPushButton>
 #include <QSplitter>
@@ -119,9 +119,7 @@ MachinePage::MachinePage(Machine machine, QWidget* parent)
     banner_->setWordWrap(true);
     banner_->setAlignment(Qt::AlignCenter);
     banner_->setStyleSheet(u"background: #464646; color: white; padding: 6px; border-radius: 4px;"_s);
-    log_ = new QPlainTextEdit;
-    log_->setReadOnly(true);
-    log_->setLineWrapMode(QPlainTextEdit::WidgetWidth);
+    log_ = new ChatView;
     input_ = new QLineEdit;
     input_->setPlaceholderText(u"Écrire à la personne dépannée…"_s);
     input_->setMaxLength(chat::MAX_CHARS);
@@ -294,12 +292,7 @@ void MachinePage::append(const ChatMessage& m) {
     const QString name = !m.name.isEmpty() ? m.name
                        : m.fromUser ? tailnet::shownHost(machine_.host)
                        : chat::helperName();
-    if (const QString time = QDateTime::fromSecsSinceEpoch(m.time).toString(u"HH 'h' mm"_s); time != chatTime_) {
-        chatTime_ = time;
-        log_->appendPlainText(u"— %1 —"_s.arg(time));
-    }
-    // Du texte, jamais de balisage
-    log_->appendPlainText(chat::shown(name, m.text));
+    log_->addMessage(m, name);
 }
 
 void MachinePage::allowAssistant(bool allowed) {

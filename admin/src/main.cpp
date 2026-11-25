@@ -5,6 +5,7 @@
 // son icône dans la zone de notification, qui reste quand la fenêtre est fermée
 // et prévient quand un ordinateur arrive.
 
+#include "assistant.hpp"
 #include "chat.hpp"
 #include "mainwindow.hpp"
 #include "singleinstance.hpp"
@@ -36,6 +37,13 @@ void linkSkill() {
 }  // namespace
 
 int main(int argc, char** argv) {
+    // Commandes du tchat pour l'assistant : sans fenêtre
+    QStringList first;
+    if (argc > 1)
+        first << QString::fromLocal8Bit(argv[1]);
+    if (assistant::isCommand(first))
+        return assistant::run(argc, argv);
+
     QApplication app(argc, argv);
     QApplication::setApplicationName(u"packarch-admin"_s);
     QApplication::setApplicationVersion(QStringLiteral(APP_VERSION));

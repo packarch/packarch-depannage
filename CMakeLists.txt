@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 3.21)
 # - packarch-admin : la personne qui dépanne (dossier admin) ;
 # - common : ce qu'ils partagent.
 # Une seule version pour les deux programmes : celle du tag du dépôt
-project(packarch-depannage VERSION 0.4.6 LANGUAGES CXX)
+project(packarch-depannage VERSION 0.4.7 LANGUAGES CXX)
 
 option(BUILD_DEPANNAGE "packarch-depannage (ordinateur dépanné)" ON)
 option(BUILD_ADMIN "packarch-admin (personne qui dépanne ; demande qtermwidget)" ON)
@@ -34,7 +34,8 @@ target_include_directories(common-core PUBLIC common)
 add_library(common STATIC
   common/singleinstance.cpp common/singleinstance.hpp
   common/theme.cpp common/theme.hpp
-  common/emoji.cpp common/emoji.hpp)
+  common/emoji.cpp common/emoji.hpp
+  common/chatview.cpp common/chatview.hpp)
 target_link_libraries(common PUBLIC common-core Qt6::Network Qt6::Widgets)
 
 if(BUILD_DEPANNAGE)
@@ -67,7 +68,7 @@ if(BUILD_DEPANNAGE)
   qt_add_resources(packarch-depannage-gui depannage-data PREFIX / BASE depannage/data FILES depannage/data/packarch-logo.png)
 
   add_executable(test_depannage depannage/tests/test_depannage.cpp)
-  target_link_libraries(test_depannage PRIVATE depannage-core Qt6::Test)
+  target_link_libraries(test_depannage PRIVATE depannage-core common Qt6::Test)
   add_test(NAME depannage COMMAND test_depannage)
 
   # Composants d'installation : un paquet par programme (cmake --install build --component depannage)
@@ -95,6 +96,7 @@ if(BUILD_ADMIN)
 
   add_executable(packarch-admin
     admin/src/main.cpp
+    admin/src/assistant.cpp admin/src/assistant.hpp
     admin/src/mainwindow.cpp admin/src/mainwindow.hpp
     admin/src/machinepage.cpp admin/src/machinepage.hpp
     admin/src/screenview.cpp admin/src/screenview.hpp

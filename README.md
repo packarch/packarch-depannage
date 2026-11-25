@@ -125,6 +125,8 @@ Claude Code.
 packarch-admin                 fenêtre (une seule instance : la rouvre si elle est réduite)
 packarch-admin --tray          démarre réduit dans la zone de notification
 packarch-admin --essai NOM     essai de la notification, comme si NOM arrivait
+packarch-admin tchat-suivre NOM   pour l'assistant : messages de la personne, case cochée seulement
+packarch-admin tchat-dire NOM     pour l'assistant : envoie l'entrée standard, signée Claude, case cochée seulement
 ```
 
 ## Clé de connexion : le lien, une seule fois

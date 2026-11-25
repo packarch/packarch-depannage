@@ -1,6 +1,7 @@
 #include "window.hpp"
 
 #include "chatfile.hpp"
+#include "chatview.hpp"
 #include "emoji.hpp"
 
 #include <QApplication>
@@ -13,12 +14,14 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
-#include <QPlainTextEdit>
+#include <QPainter>
 #include <QProcess>
 #include <QPushButton>
 #include <QTimer>
 #include <QToolButton>
 #include <QVBoxLayout>
+
+#include <cmath>
 
 using namespace Qt::StringLiterals;
 
@@ -60,16 +63,58 @@ QString failureReason(int code, const QByteArray& stderrText) {
 }
 }  // namespace
 
+/// Le logo de Packarch (le pacman jaune de packarch-logo.svg), qui mâche : la
+/// bouche s'ouvre et se referme, plus vite pendant un dépannage. Rien ne tourne
+/// quand la fenêtre n'est pas affichée.
+class PacmanLogo : public QWidget {
+public:
+    explicit PacmanLogo(QWidget* parent) : QWidget(parent) {
+        setFixedSize(56, 56);
+        timer_.setInterval(40);
+        connect(&timer_, &QTimer::timeout, this, [this] {
+            phase_ += timer_.interval() / period_;
+            if (phase_ >= 1)
+                phase_ -= 1;
+            update();
+        });
+    }
+    /// Durée d'une bouchée, en millisecondes
+    void setPeriod(double ms) { period_ = ms; }
+
+protected:
+    void showEvent(QShowEvent*) override { timer_.start(); }
+    void hideEvent(QHideEvent*) override { timer_.stop(); }
+    void paintEvent(QPaintEvent*) override {
+        QPainter painter(this);
+        painter.setRenderHint(QPainter::Antialiasing);
+        // Comme le logo : un disque de rayon 45 sur 100, dégradé du haut vers le bas,
+        // bouche à droite, ouverte de 35° de chaque côté au plus
+        const double side = qMin(width(), height());
+        const QRectF disc(side * 0.05, side * 0.05, side * 0.9, side * 0.9);
+        QLinearGradient yellow(disc.topLeft(), disc.bottomLeft());
+        yellow.setColorAt(0, QColor(0xff, 0xd9, 0x5a));
+        yellow.setColorAt(1, QColor(0xf0, 0xb4, 0x29));
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(yellow);
+        // Ouverture en douceur : 0 (fermée) à 1 (grande ouverte), aller et retour
+        const double open = 0.5 - 0.5 * std::cos(phase_ * 2 * M_PI);
+        const double half = 2 + 33 * open;
+        painter.drawPie(disc, static_cast<int>(half * 16), static_cast<int>((360 - 2 * half) * 16));
+    }
+
+private:
+    QTimer timer_;
+    double phase_ = 0.5;
+    double period_ = 1400;
+};
+
 Window::Window(QWidget* parent) : QWidget(parent) {
     setWindowTitle(u"%1 %2"_s.arg(TITLE, QStringLiteral(APP_VERSION)));
     const QPixmap logo(u":/packarch-logo.png"_s);
     setWindowIcon(QIcon(logo));
 
     // En-tête : le logo de Packarch, l'état de la session à côté
-    auto* logoLabel = new QLabel;
-    logoLabel->setPixmap(logo.scaled(52, 52, Qt::KeepAspectRatio, Qt::SmoothTransformation));
-    logoLabel->setFixedSize(56, 56);
-    logoLabel->setAlignment(Qt::AlignCenter);
+    logo_ = new PacmanLogo(this);
     title_ = new QLabel;
     title_->setTextFormat(Qt::RichText);
     text_ = new QLabel;
@@ -81,7 +126,7 @@ Window::Window(QWidget* parent) : QWidget(parent) {
     headText->addWidget(text_);
     auto* head = new QHBoxLayout;
     head->setSpacing(12);
-    head->addWidget(logoLabel, 0, Qt::AlignTop);
+    head->addWidget(logo_, 0, Qt::AlignTop);
     head->addLayout(headText, 1);
 
     link_ = new QLabel;
@@ -120,8 +165,7 @@ Window::Window(QWidget* parent) : QWidget(parent) {
     chat_ = new QWidget;
     auto* chatLayout = new QVBoxLayout(chat_);
     chatLayout->setContentsMargins(0, 4, 0, 0);
-    log_ = new QPlainTextEdit;
-    log_->setReadOnly(true);
+    log_ = new ChatView;
     log_->setMinimumHeight(120);
     input_ = new QLineEdit;
     input_->setPlaceholderText(u"Écrire à la personne qui vous dépanne…"_s);
@@ -212,6 +256,8 @@ void Window::pollStatus() {
 void Window::apply(const session::Status& st) {
     status_ = st;
     const session::Description d = session::describe(st);
+    // Le logo mâche plus vite pendant un dépannage
+    logo_->setPeriod(st.active ? 600 : 1400);
     title_->setText(u"<span style='font-size:13pt; font-weight:600'>%1</span>"_s.arg(d.title.toHtmlEscaped()));
     text_->setText(d.text);
 
@@ -262,22 +308,16 @@ void Window::pollChat() {
     if (!QFile::exists(chatfile::CHAT)) {
         if (chatPos_ > 0)
             log_->clear();
-        chatTime_.clear();
         chatPos_ = 0;
         // Fichier neuf : ses messages arriveront en direct
         chatLive_ = true;
     }
     for (const ChatMessage& m : chatfile::readNew(chatfile::CHAT, chatPos_)) {
-        // Chaque message commence par le nom de celui qui l'écrit ; l'heure, quand elle change
+        // Chaque message commence par le nom de celui qui l'écrit
         const QString name = !m.name.isEmpty() ? m.name
                            : m.fromUser ? session::userName()
                            : status_.helperName.value_or(u"La personne qui vous dépanne"_s);
-        if (const QString time = localTime(m.time); time != chatTime_) {
-            chatTime_ = time;
-            log_->appendPlainText(u"— %1 —"_s.arg(time));
-        }
-        // Du texte, jamais de balisage
-        log_->appendPlainText(chat::shown(name, m.text));
+        log_->addMessage(m, name);
         if (chatLive_ && !m.fromUser && !(isVisible() && isActiveWindow())) {
             QProcess::startDetached(u"notify-send"_s, {u"--app-name=packarch-depannage"_s, u"--"_s,
                                                        u"Dépannage : message reçu"_s, chat::notificationBody(m.text)});
