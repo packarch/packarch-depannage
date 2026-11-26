@@ -7,6 +7,9 @@
 
 #include <QApplication>
 #include <QCloseEvent>
+#include <QDBusConnection>
+#include <QDBusConnectionInterface>
+#include <QDBusServiceWatcher>
 #include <QLabel>
 #include <QListWidget>
 #include <QMenu>
@@ -15,6 +18,9 @@
 #include <QSplitter>
 #include <QStackedWidget>
 #include <QSystemTrayIcon>
+#include <QTimer>
+
+#include <chrono>
 
 using namespace Qt::StringLiterals;
 
@@ -25,6 +31,11 @@ const QString ICON_IDLE = u"preferences-desktop-remote-desktop-symbolic"_s;
 const QString ICON_WAITING = u"preferences-desktop-remote-desktop"_s;
 /// Action par défaut d'une notification : celle d'un clic sur la notification
 const QString ACTION = u"default"_s;
+/// Service par lequel une barre annonce sa zone de notification
+const QString TRAY_WATCHER = u"org.kde.StatusNotifierWatcher"_s;
+/// Zone de notification absente : nouveaux essais, pendant deux minutes
+constexpr std::chrono::seconds TRAY_RETRY{3};
+constexpr int TRAY_TRIES = 40;
 QIcon icon(bool waiting) {
     const QIcon fallback = QIcon::fromTheme(ICON_WAITING, QIcon::fromTheme(u"computer"_s));
     return waiting ? fallback : QIcon::fromTheme(ICON_IDLE, fallback);
@@ -56,20 +67,7 @@ MainWindow::MainWindow(QWidget* parent)
         select(item ? item->data(Qt::UserRole).toString() : QString());
     });
 
-    if (QSystemTrayIcon::isSystemTrayAvailable()) {
-        tray_ = new QSystemTrayIcon(icon(false), this);
-        trayMenu_ = new QMenu(this);
-        tray_->setContextMenu(trayMenu_);
-        connect(tray_, &QSystemTrayIcon::activated, this, [this](QSystemTrayIcon::ActivationReason reason) {
-            if (reason != QSystemTrayIcon::Trigger)
-                return;
-            if (isVisible() && isActiveWindow())
-                hide();
-            else
-                showMachine();
-        });
-        tray_->show();
-    }
+    setupTray();
 
     connect(tailnet_, &Tailnet::polled, this, &MainWindow::refresh);
     connect(tailnet_, &Tailnet::arrived, this, &MainWindow::announce);
@@ -190,6 +188,45 @@ void MainWindow::refresh() {
         quitting_ = true;
         qApp->quit();
     });
+}
+
+void MainWindow::setupTray() {
+    if (tray_)
+        return;
+    // À l'ouverture du bureau, le programme démarre souvent avant la barre : pas
+    // encore de zone de notification. On attend qu'elle s'annonce, sans rien
+    // demander à Qt d'ici là : il ne regarde qu'une fois et retient « aucune ».
+    const QDBusConnection bus = QDBusConnection::sessionBus();
+    const bool announced = bus.interface() && bus.interface()->isServiceRegistered(TRAY_WATCHER);
+    if (!announced) {
+        if (!trayWatcher_) {
+            trayWatcher_ = new QDBusServiceWatcher(TRAY_WATCHER, bus, QDBusServiceWatcher::WatchForRegistration, this);
+            connect(trayWatcher_, &QDBusServiceWatcher::serviceRegistered, this, &MainWindow::setupTray);
+        }
+        // Sous Wayland, il n'y a pas d'autre zone de notification que celle-là
+        if (QGuiApplication::platformName().startsWith(u"wayland"))
+            return;
+    }
+    if (!QSystemTrayIcon::isSystemTrayAvailable()) {
+        // Sous X11, la zone d'une barre pas encore lancée : quelques essais de plus
+        if (trayTries_++ < TRAY_TRIES)
+            QTimer::singleShot(TRAY_RETRY, this, &MainWindow::setupTray);
+        return;
+    }
+    tray_ = new QSystemTrayIcon(icon(false), this);
+    trayMenu_ = new QMenu(this);
+    tray_->setContextMenu(trayMenu_);
+    connect(tray_, &QSystemTrayIcon::activated, this, [this](QSystemTrayIcon::ActivationReason reason) {
+        if (reason != QSystemTrayIcon::Trigger)
+            return;
+        if (isVisible() && isActiveWindow())
+            hide();
+        else
+            showMachine();
+    });
+    tray_->show();
+    // Son menu et son info-bulle (la fenêtre est déjà construite si l'icône arrive tard)
+    QMetaObject::invokeMethod(this, &MainWindow::refresh, Qt::QueuedConnection);
 }
 
 void MainWindow::select(const QString& key) {

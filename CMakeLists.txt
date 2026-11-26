@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 3.21)
 # - packarch-admin : la personne qui dépanne (dossier admin) ;
 # - common : ce qu'ils partagent.
 # Une seule version pour les deux programmes : celle du tag du dépôt
-project(packarch-depannage VERSION 0.4.10 LANGUAGES CXX)
+project(packarch-depannage VERSION 0.4.11 LANGUAGES CXX)
 
 option(BUILD_DEPANNAGE "packarch-depannage (ordinateur dépanné)" ON)
 option(BUILD_ADMIN "packarch-admin (personne qui dépanne ; demande qtermwidget)" ON)
@@ -18,7 +18,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 include(GNUInstallDirs)
-find_package(Qt6 6.5 REQUIRED COMPONENTS Widgets Network Test)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Widgets Network DBus Test)
 add_compile_options(-Wall -Wextra -Wpedantic)
 add_compile_definitions(QT_NO_CAST_FROM_ASCII QT_NO_CAST_TO_ASCII)
 enable_testing()
@@ -104,7 +104,7 @@ if(BUILD_ADMIN)
     admin/src/screenview.cpp admin/src/screenview.hpp
     admin/src/terminal.cpp admin/src/terminal.hpp)
   target_compile_definitions(packarch-admin PRIVATE APP_VERSION="${PROJECT_VERSION}")
-  target_link_libraries(packarch-admin PRIVATE admin-core Qt6::Widgets qtermwidget6)
+  target_link_libraries(packarch-admin PRIVATE admin-core Qt6::Widgets Qt6::DBus qtermwidget6)
   # Scripts envoyés à l'ordinateur dépanné (infos, écran, saisie), embarqués dans le programme
   qt_add_resources(packarch-admin admin-data PREFIX / BASE admin/data FILES admin/data/infos.sh admin/data/capture.sh admin/data/saisie.py)
 

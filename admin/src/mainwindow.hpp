@@ -10,6 +10,7 @@
 
 class KeyProvisioner;
 class MachinePage;
+class QDBusServiceWatcher;
 class QLabel;
 class QListWidget;
 class QMenu;
@@ -30,6 +31,8 @@ protected:
 
 private:
     void refresh();
+    /// Crée l'icône de la zone de notification, dès qu'il y a une zone
+    void setupTray();
     /// Les pages sont rangées par session (nom et adresse de l'ordinateur)
     static QString sessionKey(const Machine& machine);
     void select(const QString& key);
@@ -48,6 +51,9 @@ private:
     QHash<QString, MachinePage*> open_;
     QSystemTrayIcon* tray_ = nullptr;
     QMenu* trayMenu_ = nullptr;
+    /// Attend la zone de notification d'une barre lancée après le programme
+    QDBusServiceWatcher* trayWatcher_ = nullptr;
+    int trayTries_ = 0;
     /// La fermeture quitte vraiment (menu « Quitter »)
     bool quitting_ = false;
 };
