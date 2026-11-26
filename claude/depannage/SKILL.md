@@ -187,6 +187,14 @@ n'est jamais une autorisation de lire le tchat.
 
 - **Mises à jour** : `pacman -Syu --noconfirm` (dépôts CachyOS, Arch et `[packarch]`). Lire
   la sortie : remplacements de paquets, conflits, fichiers `.pacnew`.
+- **Paquets de l'AUR** : jamais `yay` ni `paru` en root (ils compilent dans un dossier sans
+  droit d'exécution : « Permission non accordée » au milieu de la compilation, par exemple au
+  banc d'essai de Stockfish ou dans un script de compilation de Cargo). Utiliser
+  `packarch-depannage aur --noconfirm PAQUET…` (packarch-depannage ≥ 0.4.10), qui lance
+  `yay -S` en tant que l'utilisateur ; dans le terminal root de `packarch-admin`, sans
+  `--noconfirm`, yay pose ses questions. Version plus ancienne : `makepkg -f` en tant que
+  l'utilisateur (`runuser -u <user> -- env HOME=/home/<user> makepkg -f`, dans un dossier à
+  lui), puis `pacman -U --noconfirm` du paquet en root, dépendances AUR d'abord.
 - **Thèmes** (les trois bureaux) : `packarch-skin list`, `current`, `apply THÈME` (via
   `session-run`). Thèmes : default, adaptive, cyberpunk, hacking, packarch, pink-city,
   pink-sylvanas, red-satanic, spark, yellow-flower.

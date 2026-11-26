@@ -1,3 +1,4 @@
+#include "aur.hpp"
 #include "chatfile.hpp"
 #include "chatview.hpp"
 #include "session.hpp"
@@ -123,6 +124,20 @@ private slots:
         QCOMPARE(chat::notificationBody(QString(36, u'é')), QString(36, u'é'));
         QCOMPARE(chat::notificationBody(QString(37, u'é')), QString(36, u'é') + u'…');
         QCOMPARE(chat::notificationBody(u"a <b> & c"_s), u"a &lt;b&gt; &amp; c"_s);
+    }
+
+    void aurSudoRule() {
+        // pacman seulement, pour ce compte seulement
+        const QString rule = aur::sudoersRule(u"maman"_s);
+        QVERIFY(rule.endsWith(u"maman ALL=(root) NOPASSWD: /usr/bin/pacman\n"_s));
+        // Rien pour root, ni pour un nom qui écrirait autre chose dans la règle
+        QVERIFY(aur::sudoersRule(u"root"_s).isEmpty());
+        QVERIFY(aur::sudoersRule(u"ALL"_s).isEmpty());
+        QVERIFY(aur::sudoersRule(u"a b"_s).isEmpty());
+        QVERIFY(aur::sudoersRule(u"x\ny ALL=(ALL) NOPASSWD: ALL"_s).isEmpty());
+        QVERIFY(aur::sudoersRule(QString()).isEmpty());
+        // sudo ignore les fichiers dont le nom contient un point
+        QVERIFY(!aur::sudoersPath().section(u'/', -1).contains(u'.'));
     }
 
     void appendedThenReadOnce() {

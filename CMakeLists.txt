@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 3.21)
 # - packarch-admin : la personne qui dépanne (dossier admin) ;
 # - common : ce qu'ils partagent.
 # Une seule version pour les deux programmes : celle du tag du dépôt
-project(packarch-depannage VERSION 0.4.9 LANGUAGES CXX)
+project(packarch-depannage VERSION 0.4.10 LANGUAGES CXX)
 
 option(BUILD_DEPANNAGE "packarch-depannage (ordinateur dépanné)" ON)
 option(BUILD_ADMIN "packarch-admin (personne qui dépanne ; demande qtermwidget)" ON)
@@ -43,7 +43,8 @@ if(BUILD_DEPANNAGE)
   add_library(depannage-core STATIC
     depannage/src/session.cpp depannage/src/session.hpp
     depannage/src/chatfile.cpp depannage/src/chatfile.hpp
-    depannage/src/desktop.cpp depannage/src/desktop.hpp)
+    depannage/src/desktop.cpp depannage/src/desktop.hpp
+    depannage/src/aur.cpp depannage/src/aur.hpp)
   target_link_libraries(depannage-core PUBLIC common-core)
   target_include_directories(depannage-core PUBLIC depannage/src)
 

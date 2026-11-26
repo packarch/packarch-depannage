@@ -9,6 +9,7 @@
 //
 // Le programme de la personne qui dépanne est packarch-admin (dossier admin).
 
+#include "aur.hpp"
 #include "chatfile.hpp"
 #include "desktop.hpp"
 #include "session.hpp"
@@ -35,6 +36,8 @@ const char USAGE[] = R"(Usage : packarch-depannage [COMMANDE]
   session-run COMMANDE…   lance COMMANDE dans le bureau de l'utilisateur connecté (root)
 
 En root (pkexec, ou par la fenêtre) :
+  aur [OPTIONS] PAQUET…   installe des paquets de l'AUR : yay -S en tant que l'utilisateur
+                          (yay lancé en root échoue aux compilations)
   start [MINUTES]         démarre une session (60 min par défaut)
   extend [MINUTES]        prolonge la session (60 min par défaut)
   stop                    arrête la session
@@ -109,6 +112,10 @@ int main(int argc, char** argv) {
         desktop::info();
     } else if (command == "session-run"_L1) {
         const int code = desktop::sessionRun(args.mid(1), &error);
+        if (error.isEmpty())
+            return qBound(0, code, 255);
+    } else if (command == "aur"_L1) {
+        const int code = aur::run(args.mid(1), &error);
         if (error.isEmpty())
             return qBound(0, code, 255);
     } else if (command == "start"_L1) {

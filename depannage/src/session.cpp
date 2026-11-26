@@ -1,5 +1,7 @@
 #include "session.hpp"
 
+#include "aur.hpp"
+
 #include "chatfile.hpp"
 #include "chatmsg.hpp"
 #include "tailscale.hpp"
@@ -354,6 +356,8 @@ Error stop(bool ifActive) {
         run(u"systemctl"_s, {u"stop"_s, TSD_UNIT + u".service"_s});
     }
     QFile::remove(STATE);
+    // Règle sudo de « aur » restée après une commande tuée
+    aur::cleanup();
     say(u"Session de dépannage terminée."_s);
     return {};
 }

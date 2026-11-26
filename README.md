@@ -218,6 +218,7 @@ pkexec packarch-depannage start [MIN]    démarre une session (60 min par défau
 pkexec packarch-depannage extend [MIN]   prolonge la session
 pkexec packarch-depannage stop           arrête la session (sans mot de passe)
 
+packarch-depannage aur [OPTIONS] PAQUET  installe des paquets de l'AUR : yay -S en tant que l'utilisateur (root)
 packarch-depannage chat-say              envoie le message lu sur l'entrée standard (root)
 packarch-depannage chat-follow           messages du tchat au fil de l'eau, en JSON (root)
 ```
@@ -225,6 +226,14 @@ packarch-depannage chat-follow           messages du tchat au fil de l'eau, en J
 `session-run` lance la commande en tant que l'utilisateur connecté, avec l'environnement de
 son bureau (`DISPLAY`, `XAUTHORITY`, bus D-Bus, `XDG_*`, repris d'un de ses processus
 graphiques) : relancer la barre (`packarch-skin bar`), appliquer un thème, notifier…
+
+`aur` installe des paquets de l'AUR. `yay` lancé en root compile dans un bac à sable de
+systemd dont le dossier est monté sans droit d'exécution (systemd 262) : toute compilation qui
+lance un programme qu'elle vient de produire y échoue (« Permission non accordée » : banc
+d'essai de Stockfish, scripts de compilation de Cargo…). `aur` lance donc `yay -S` en tant que
+l'utilisateur de l'ordinateur, avec les options et les paquets donnés ; une règle sudo
+temporaire (`/etc/sudoers.d/zz-packarch-depannage-aur` : `pacman` sans mot de passe, pour ce
+compte) est écrite le temps de la commande, puis retirée (au plus tard à la fin de la session).
 
 Exemple, depuis l'ordinateur de la personne qui dépanne :
 
