@@ -1,7 +1,7 @@
 // packarch-depannage : dépannage à distance temporaire de Packarch.
 //
-// La fenêtre (sans argument) démarre, sur demande de l'utilisateur et avec son
-// mot de passe (pkexec), une session Tailscale avec Tailscale SSH : elle
+// La fenêtre (sans argument) démarre, sur demande de l'utilisateur (pkexec : sans
+// mot de passe pour un administrateur), une session Tailscale avec Tailscale SSH : elle
 // affiche le lien de connexion à transmettre à la personne qui dépanne, qui
 // l'ouvre avec son compte Tailscale ; l'ordinateur rejoint alors son réseau et
 // elle peut s'y connecter en SSH (root). La session s'arrête toute seule

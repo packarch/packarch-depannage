@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 3.21)
 # - packarch-admin : la personne qui dépanne (dossier admin) ;
 # - common : ce qu'ils partagent.
 # Une seule version pour les deux programmes : celle du tag du dépôt
-project(packarch-depannage VERSION 0.4.8 LANGUAGES CXX)
+project(packarch-depannage VERSION 0.4.9 LANGUAGES CXX)
 
 option(BUILD_DEPANNAGE "packarch-depannage (ordinateur dépanné)" ON)
 option(BUILD_ADMIN "packarch-admin (personne qui dépanne ; demande qtermwidget)" ON)
@@ -78,6 +78,7 @@ if(BUILD_DEPANNAGE)
   install(FILES depannage/data/packarch-logo.png DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps RENAME org.packarch.Depannage.png COMPONENT depannage)
   install(FILES depannage/data/packarch-logo.svg DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps RENAME org.packarch.Depannage.svg COMPONENT depannage)
   install(FILES depannage/data/org.packarch.depannage.policy DESTINATION ${CMAKE_INSTALL_DATADIR}/polkit-1/actions COMPONENT depannage)
+  install(FILES depannage/data/50-org.packarch.depannage.rules DESTINATION ${CMAKE_INSTALL_DATADIR}/polkit-1/rules.d COMPONENT depannage)
   install(FILES depannage/data/packarch-depannage-cleanup.service DESTINATION lib/systemd/system COMPONENT depannage)
 endif()
 

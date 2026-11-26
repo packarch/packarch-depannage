@@ -1,0 +1,13 @@
+// Packarch Dépannage : autoriser ou prolonger le dépannage sans mot de passe,
+// pour un administrateur (groupe wheel) devant l'écran. Le bouton « Autoriser
+// le dépannage » dit déjà ce qu'il donne (un accès complet à l'ordinateur), et
+// un administrateur de Packarch a sudo sans mot de passe : rien de plus ne lui
+// est accordé. Les autres comptes gardent la demande du mot de passe d'un
+// administrateur, sans quoi ouvrir un dépannage vers son propre compte
+// Tailscale leur donnerait les droits de root.
+polkit.addRule(function(action, subject) {
+    if ((action.id == "org.packarch.depannage.start" || action.id == "org.packarch.depannage.extend")
+        && subject.local && subject.active && subject.isInGroup("wheel")) {
+        return polkit.Result.YES;
+    }
+});

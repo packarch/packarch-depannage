@@ -57,8 +57,8 @@ std::optional<QString> readLine(bool& closed) {
 }
 
 /// Lance une commande de session en root : directement si ce programme l'est
-/// (console de root, sudo), sinon par pkexec, qui demande le mot de passe dans
-/// le terminal
+/// (console de root, sudo), sinon par pkexec (sans mot de passe pour un
+/// administrateur ; sinon il le demande dans le terminal)
 bool privileged(const QStringList& args) {
     if (session::requireRoot().isEmpty()) {
         QString error;
@@ -79,7 +79,7 @@ bool privileged(const QStringList& args) {
     const bool ok = process.waitForStarted(-1) && process.waitForFinished(-1)
         && process.exitStatus() == QProcess::NormalExit && process.exitCode() == 0;
     if (!ok)
-        say(u"Échec (mot de passe refusé ?). Autre moyen : sudo packarch-depannage %1"_s.arg(args.join(u' ')));
+        say(u"Échec (autorisation refusée ?). Autre moyen : sudo packarch-depannage %1"_s.arg(args.join(u' ')));
     return ok;
 }
 

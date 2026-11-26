@@ -20,8 +20,9 @@ programme.
 ## Fonctionnement
 
 1. La personne à dépanner ouvre **Packarch Dépannage** (menu Système) et clique sur
-   « Autoriser le dépannage (1 h) ». Son mot de passe est demandé (pkexec) : rien ne
-   s'ouvre sans son accord.
+   « Autoriser le dépannage (1 h) » : rien ne s'ouvre sans ce clic. Aucun mot de passe n'est
+   demandé à un administrateur de l'ordinateur (groupe `wheel`, qui a déjà `sudo` sans mot de
+   passe sur Packarch) ; un autre compte doit donner celui d'un administrateur.
 2. La fenêtre affiche un **lien de connexion Tailscale** (`https://login.tailscale.com/a/…`)
    et le nom de l'ordinateur (`packarch-<nom d'hôte>`). Elle l'envoie à la personne qui
    dépanne (SMS, e-mail…).
@@ -47,7 +48,7 @@ packarch-depannage
 ```
 
 Sans bureau, la commande passe toute seule en mode texte (`packarch-depannage texte` le
-force) : « Autoriser le dépannage pendant 1 heure ? », le mot de passe, puis le lien à
+force) : « Autoriser le dépannage pendant 1 heure ? », puis le lien à
 transmettre s'il en faut un, l'état, et le tchat (une ligne tapée est un message). `/plus`
 prolonge, `/arreter` arrête, `/quitter` quitte en laissant la session ouverte.
 
@@ -150,8 +151,7 @@ $EDITOR ~/.config/packarch-admin/tailscale-oauth      # le secret tskey-client-�
 l'ordinateur (90 jours, le maximum de Tailscale ; machine éphémère, tag `tag:depannage`
 seulement) et la dépose chez lui par Tailscale SSH (`packarch-depannage key-set`, dans
 `/var/lib/packarch-depannage/authkey`, lisible par root seul). La clé précédente de
-l'ordinateur est révoquée. Aux sessions suivantes, « Autoriser le dépannage » (toujours avec le
-mot de passe de la personne) connecte l'ordinateur tout seul, et la personne qui dépanne est
+l'ordinateur est révoquée. Aux sessions suivantes, « Autoriser le dépannage » connecte l'ordinateur tout seul, et la personne qui dépanne est
 prévenue par l'icône.
 
 Si la clé a expiré (plus de 90 jours sans dépannage), a été révoquée, ou si l'ordinateur n'en
@@ -277,7 +277,8 @@ Deux paquets, dans [myrepo-pkgs](https://github.com/packarch/myrepo-pkgs).
 
 **packarch-depannage** : le binaire dans `/usr/bin`, la fenêtre dans
 `/usr/lib/packarch-depannage`, `org.packarch.Depannage.desktop`,
-`org.packarch.depannage.policy` (polkit) et `packarch-depannage-cleanup.service` (à activer).
+`org.packarch.depannage.policy` et `50-org.packarch.depannage.rules` (polkit : pas de mot de
+passe pour un administrateur) et `packarch-depannage-cleanup.service` (à activer).
 Dépendances : `qt6-base`, `tailscale`, `polkit`, `libnotify`, `util-linux` (runuser).
 
 **packarch-admin** : le binaire dans `/usr/bin`, `org.packarch.Admin.desktop`,
